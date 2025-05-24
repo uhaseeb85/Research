@@ -259,4 +259,34 @@ src/
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Project Capabilities
+
+This project provides a robust and flexible IVR authentication service with the following key capabilities:
+
+*   **Brand-aware Authentication**: The core functionality is to authenticate IVR customers based on brand-specific rules. Different brands can have distinct authentication flows, token requirements, and customer-facing messages.
+*   **Token-based Authentication**:
+    *   Supports multiple types of authentication tokens (e.g., PIN, OTP, security question).
+    *   Allows configuration of token priorities to determine the order in which tokens are requested.
+    *   Enables setting maximum attempt limits for each token type, specific to each brand.
+*   **Session Management**:
+    *   Manages authentication sessions, distinguishing between new and continuing attempts.
+    *   Maintains authentication context across multiple interactions within a session.
+*   **Configurable Branding**:
+    *   Allows defining unique authentication configurations for multiple brands.
+    *   Supports customization of token definitions, required tokens, maximum overall attempts, and concurrent authentication settings per brand.
+    *   Provides brand-specific messaging for various authentication scenarios (e.g., success, failure, customer not found, session expired).
+*   **API Endpoints**:
+    *   `POST /api/v1/auth/customer`: The primary endpoint for authenticating customers. It accepts customer identifiers, provided tokens, and the brand to initiate or continue an authentication attempt.
+    *   `GET /api/v1/auth/methods/{brand}`: Retrieves the available authentication methods and their configurations (e.g., token definitions, required tokens, max attempts) for a specified brand.
+    *   `GET /api/v1/auth/brands`: Lists all supported brands configured in the system.
+    *   `GET /api/v1/auth/health`: A standard health check endpoint to verify the service's operational status.
+*   **Comprehensive Logging**:
+    *   Detailed logging throughout the authentication process for monitoring, auditing, and troubleshooting.
+    *   Logs include session IDs, attempt IDs, brand information, processing times, and specific event details.
+*   **Caching**:
+    *   Utilizes Spring's caching mechanism to improve performance, likely for frequently accessed configurations or context data.
+*   **Error Handling**:
+    *   Provides clear error responses, including brand-specific messages where appropriate.
+    *   Handles various error conditions such as invalid input, unsupported brand, session expiry, and system errors. 
