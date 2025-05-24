@@ -2,8 +2,11 @@ package com.bank.ivr.auth.config.impl;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
+import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -115,5 +118,51 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
     public int getPriority() {
         return 50; // Medium priority configuration
+    }
+    
+    @Override
+    public Map<String, TokenRetryStrategy> getTokenRetryStrategies() {
+        Map<String, TokenRetryStrategy> strategies = new HashMap<>();
+        
+        // Community bank uses immediate retry (more user-friendly)
+        strategies.put("SSN", TokenRetryStrategy.builder()
+                .tokenName("SSN")
+                .retryType(TokenRetryStrategy.RetryType.IMMEDIATE)
+                .maxRetries(3)
+                .progressiveLockoutEnabled(false) // More lenient
+                .build());
+                
+        strategies.put("DEBIT_CARD_PIN", TokenRetryStrategy.builder()
+                .tokenName("DEBIT_CARD_PIN")
+                .retryType(TokenRetryStrategy.RetryType.FIXED_DELAY)
+                .maxRetries(3)
+                .baseDelayMs(2000) // 2 second delay
+                .progressiveLockoutEnabled(false)
+                .build());
+                
+        strategies.put("DATE_OF_BIRTH", TokenRetryStrategy.builder()
+                .tokenName("DATE_OF_BIRTH")
+                .retryType(TokenRetryStrategy.RetryType.IMMEDIATE)
+                .maxRetries(3)
+                .progressiveLockoutEnabled(false)
+                .build());
+                
+        return strategies;
+    }
+    
+    @Override
+    public BrandGlobalRetryPolicy getGlobalRetryPolicy() {
+        return BrandGlobalRetryPolicy.builder()
+                .brandCode("COMMUNITY_BANK")
+                .maxGlobalAttempts(8) // More lenient than default
+                .globalLockoutEnabled(true)
+                .globalLockoutThreshold(10) // Higher threshold
+                .globalLockoutDuration(Duration.ofMinutes(5)) // Shorter lockout
+                .escalationPolicy(BrandGlobalRetryPolicy.EscalationPolicy.NONE) // No escalation
+                .crossTokenDelayEnabled(false) // No cross-token delays
+                .suspiciousActivityThreshold(12) // Higher threshold
+                .retryWindowResetDuration(Duration.ofMinutes(30)) // Faster reset
+                .enableRetryAnalytics(true)
+                .build();
     }
 } 

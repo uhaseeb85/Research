@@ -266,10 +266,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 This project provides a robust and flexible IVR authentication service with the following key capabilities:
 
 *   **Brand-aware Authentication**: The core functionality is to authenticate IVR customers based on brand-specific rules. Different brands can have distinct authentication flows, token requirements, and customer-facing messages.
-*   **Token-based Authentication**:
-    *   Supports multiple types of authentication tokens (e.g., PIN, OTP, security question).
-    *   Allows configuration of token priorities to determine the order in which tokens are requested.
-    *   Enables setting maximum attempt limits for each token type, specific to each brand.
+*   **Token-based Authentication**:    *   Supports multiple types of authentication tokens (e.g., PIN, OTP, security question).    *   Allows configuration of token priorities to determine the order in which tokens are requested.    *   Enables setting maximum attempt limits for each token type, specific to each brand.*   **Advanced Retry Management**:    *   **Token-level Retry Strategies**: Configurable retry patterns including immediate retry, fixed delay, exponential backoff, and linear backoff for each token type.    *   **Brand-level Retry Policies**: Global retry policies that control overall retry behavior across all tokens for specific brands.    *   **Progressive Lockout**: Increasing lockout periods after repeated failures, with configurable escalation policies.    *   **Cross-token Delay**: Failed attempts on one token can introduce delays for all subsequent token attempts.    *   **Suspicious Activity Detection**: Rapid successive failures trigger enhanced security measures and temporary lockouts.    *   **Time-based Retry Windows**: Automatic reset of retry counters after configurable time periods.    *   **Retry Analytics**: Comprehensive tracking and monitoring of retry patterns for security analysis.
 *   **Session Management**:
     *   Manages authentication sessions, distinguishing between new and continuing attempts.
     *   Maintains authentication context across multiple interactions within a session.

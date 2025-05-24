@@ -1,9 +1,4 @@
-package com.bank.ivr.auth.config;
-
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-
-import java.util.List;
-import java.util.Map;
+package com.bank.ivr.auth.config;import com.bank.ivr.auth.model.domain.AuthTokenDefinition;import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;import com.bank.ivr.auth.model.domain.TokenRetryStrategy;import java.util.List;import java.util.Map;
 
 /**
  * Interface for brand-specific authentication configuration.
@@ -54,12 +49,7 @@ public interface BrandAuthConfiguration {
      */
     boolean isConcurrentTokenAuthAllowed();
     
-    /**
-     * Gets brand-specific messages or prompts.
-     * 
-     * @return map of message keys to brand-specific text
-     */
-    Map<String, String> getBrandMessages();
+        /**     * Gets brand-specific messages or prompts.     *      * @return map of message keys to brand-specific text     */    Map<String, String> getBrandMessages();        /**     * Gets brand-specific retry strategies for tokens.     *      * @return map of token name to retry strategy     */    Map<String, TokenRetryStrategy> getTokenRetryStrategies();        /**     * Gets the global retry policy for this brand.     * Controls overall retry behavior across all tokens.     *      * @return global retry configuration     */    BrandGlobalRetryPolicy getGlobalRetryPolicy();
     
     /**
      * Gets the priority of this configuration (used when multiple configs match).

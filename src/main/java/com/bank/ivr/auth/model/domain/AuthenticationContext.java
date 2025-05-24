@@ -52,6 +52,12 @@ public class AuthenticationContext {
     @JsonProperty("failedTokens")
     private List<String> failedTokens;
     
+    @JsonProperty("tokenRetryStates")
+    private Map<String, TokenRetryState> tokenRetryStates;
+    
+    @JsonProperty("globalRetryState")
+    private GlobalRetryState globalRetryState;
+    
     @JsonCreator
     public AuthenticationContext(
             @JsonProperty("attemptId") String attemptId,
@@ -152,6 +158,14 @@ public class AuthenticationContext {
         return failedTokens;
     }
     
+    public Map<String, TokenRetryState> getTokenRetryStates() {
+        return tokenRetryStates;
+    }
+    
+    public GlobalRetryState getGlobalRetryState() {
+        return globalRetryState;
+    }
+    
     // Setters for mutable operations
     public void setTokenAttemptsRemaining(Map<String, Integer> tokenAttemptsRemaining) {
         this.tokenAttemptsRemaining = tokenAttemptsRemaining;
@@ -183,6 +197,14 @@ public class AuthenticationContext {
     
     public void setFailedTokens(List<String> failedTokens) {
         this.failedTokens = failedTokens;
+    }
+    
+    public void setTokenRetryStates(Map<String, TokenRetryState> tokenRetryStates) {
+        this.tokenRetryStates = tokenRetryStates;
+    }
+    
+    public void setGlobalRetryState(GlobalRetryState globalRetryState) {
+        this.globalRetryState = globalRetryState;
     }
     
     // Helper methods
