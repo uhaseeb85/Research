@@ -101,10 +101,14 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
     public Map<String, String> getBrandMessages() {
         Map<String, String> messages = new HashMap<>();
         messages.put("welcome", "Welcome to Premium Bank. For your security, we require enhanced authentication.");
-        messages.put("primary_prompt", "Please provide your 4-digit PIN.");
-        messages.put("secondary_prompt", "Please also provide your date of birth for additional verification.");
+        messages.put("primary_prompt", "Please provide your {token_description} for secure access.");
+        messages.put("secondary_prompt", "Thank you. For additional security, please provide your {token_description}.");
         messages.put("success", "Authentication successful. Welcome to Premium Banking services.");
         messages.put("failure", "Authentication failed. Please contact Premium Support at 1-800-PREMIUM.");
+        messages.put("customer_not_found", "Customer account not found. Please verify your information or contact Premium Support.");
+        messages.put("session_expired", "Your secure session has expired. Please start the authentication process again.");
+        messages.put("system_error", "A system error occurred. Please try again or contact Premium Support at 1-800-PREMIUM.");
+        messages.put("no_methods", "No authentication methods available. Please contact Premium Support at 1-800-PREMIUM.");
         return messages;
     }
     

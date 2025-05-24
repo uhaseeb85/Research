@@ -195,13 +195,21 @@ public class BrandAuthConfigurationService {
             case "welcome":
                 return "Welcome! Let's verify your identity.";
             case "primary_prompt":
-                return "Please provide your authentication information.";
+                return "Please provide your {token_description}.";
             case "secondary_prompt":
-                return "Please provide additional verification.";
+                return "Thank you. Now please provide your {token_description}.";
             case "success":
                 return "Authentication successful.";
             case "failure":
                 return "Authentication failed. Please try again or contact support.";
+            case "customer_not_found":
+                return "Customer not found. Please verify your information.";
+            case "session_expired":
+                return "Authentication session expired. Please start over.";
+            case "system_error":
+                return "An error occurred. Please try again.";
+            case "no_methods":
+                return "No available authentication methods.";
             default:
                 return "Please follow the authentication prompts.";
         }

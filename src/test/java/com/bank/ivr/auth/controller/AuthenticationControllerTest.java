@@ -493,7 +493,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("Invalid token format")));
+                    .andExpect(jsonPath("$.message", is("Authentication failed. Please contact Premium Support at 1-800-PREMIUM.")));
 
             verify(brandConfigService).getBrandMessage("PREMIUM_BANK", "failure");
         }

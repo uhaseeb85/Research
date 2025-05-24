@@ -125,7 +125,7 @@ public class AuthenticationController {
             AuthenticationResponse errorResponse = AuthenticationResponse.builder()
                     .attemptId(attemptId)
                     .status(AuthenticationResponse.AuthStatus.FAILED)
-                    .message("Invalid request: " + e.getMessage())
+                    .message(brandMessage != null ? brandMessage : "Invalid request: " + e.getMessage())
                     .build();
             
             logger.debug("AUTH_REQUEST_COMPLETED - SessionId: {}, Brand: {}, HttpStatus: 400", sessionId, brand);

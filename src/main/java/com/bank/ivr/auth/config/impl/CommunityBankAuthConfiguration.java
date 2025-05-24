@@ -100,11 +100,15 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
     public Map<String, String> getBrandMessages() {
         Map<String, String> messages = new HashMap<>();
-        messages.put("welcome", "Hello! Welcome to Community Bank. Let's verify your identity.");
-        messages.put("primary_prompt", "Please provide the last 4 digits of your Social Security Number.");
-        messages.put("secondary_prompt", "Thank you. Please provide your date of birth.");
-        messages.put("success", "Great! You're all set. How can we help you today?");
-        messages.put("failure", "We couldn't verify your identity. Please visit your local branch or call us at 1-800-COMMUNITY.");
+        messages.put("welcome", "Welcome to Community Bank! We're here to help verify your identity.");
+        messages.put("primary_prompt", "Please provide your {token_description} to continue.");
+        messages.put("secondary_prompt", "Thank you. Please also provide your {token_description}.");
+        messages.put("success", "Authentication successful. Welcome to Community Banking!");
+        messages.put("failure", "Authentication failed. Please try again or visit your local Community Bank branch.");
+        messages.put("customer_not_found", "We couldn't find your account. Please check your information or visit your local branch.");
+        messages.put("session_expired", "Your session has timed out. Please start over to verify your identity.");
+        messages.put("system_error", "We're experiencing technical difficulties. Please try again or visit your local branch.");
+        messages.put("no_methods", "No verification methods available. Please visit your local Community Bank branch for assistance.");
         return messages;
     }
     

@@ -14,54 +14,72 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Service responsible for managing authentication context creation and lifecycle.
+ * Service responsible for managing brand-aware authentication context creation and lifecycle.
  */
 @Service
 public class AuthenticationContextService {
     
     private static final Logger logger = LoggerFactory.getLogger(AuthenticationContextService.class);
-    private static final int DEFAULT_OVERALL_ATTEMPTS = 5;
     
     private final AuthenticationContextRepository contextRepository;
     private final EligibilityService eligibilityService;
-    private final List<AuthTokenDefinition> tokenDefinitions;
+    private final BrandAuthConfigurationService brandConfigService;
     
     @Autowired
     public AuthenticationContextService(
             AuthenticationContextRepository contextRepository,
             EligibilityService eligibilityService,
-            List<AuthTokenDefinition> tokenDefinitions) {
+            BrandAuthConfigurationService brandConfigService) {
         this.contextRepository = contextRepository;
         this.eligibilityService = eligibilityService;
-        this.tokenDefinitions = tokenDefinitions;
+        this.brandConfigService = brandConfigService;
     }
     
     /**
-     * Creates the initial authentication context for a new attempt.
+     * Creates the initial authentication context for a new attempt with full brand awareness.
      */
     public AuthenticationContext createInitialContext(String attemptId, AuthenticationRequest request, 
                                                      CustomerProfile customerProfile) {
-        // Determine eligible tokens
-        List<String> eligibleTokens = eligibilityService.determineEligibleTokens(customerProfile);
+        String brand = request.getBrand();
+        logger.debug("Creating brand-aware initial context for attempt: {}, brand: {}", attemptId, brand);
         
-        // Set required tokens (business rule: require at least one primary authentication factor)
-        List<String> requiredTokens = Arrays.asList("SSN"); // Simplified - in reality this would be configurable
+        // Determine eligible tokens with brand awareness
+        List<String> eligibleTokens = eligibilityService.determineEligibleTokens(customerProfile, brand);
         
-        // Initialize token attempts
+        // Get brand-specific required tokens
+        List<String> requiredTokens = brandConfigService.getRequiredTokensForBrand(brand);
+        
+        // Get brand-specific token definitions for attempt calculations
+        List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
+        Map<String, Integer> brandSpecificAttempts = brandConfigService.getBrandSpecificTokenAttempts(brand);
+        
+        // Initialize token attempts using brand-specific configurations
         Map<String, Integer> tokenAttempts = new HashMap<>();
-        for (AuthTokenDefinition tokenDef : tokenDefinitions) {
+        for (AuthTokenDefinition tokenDef : brandTokenDefinitions) {
             if (eligibleTokens.contains(tokenDef.getName())) {
-                tokenAttempts.put(tokenDef.getName(), tokenDef.getMaxAttempts());
+                // Use brand-specific override if available, otherwise use token definition default
+                Integer attempts = brandSpecificAttempts.get(tokenDef.getName());
+                if (attempts == null) {
+                    attempts = tokenDef.getMaxAttempts();
+                }
+                tokenAttempts.put(tokenDef.getName(), attempts);
             }
         }
+        
+        // Get brand-specific overall attempts limit
+        int maxOverallAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
+        
+        logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, RequiredTokens: {}, MaxOverallAttempts: {}", 
+                    brand, eligibleTokens, requiredTokens, maxOverallAttempts);
         
         return AuthenticationContext.builder()
                 .attemptId(attemptId)
                 .sessionId(request.getSessionId())
                 .customerIdentifier(request.getCustomerIdentifier())
+                .brand(brand)  // Store brand information in context
                 .startTime(LocalDateTime.now())
                 .tokenAttemptsRemaining(tokenAttempts)
-                .overallAttemptsRemaining(DEFAULT_OVERALL_ATTEMPTS)
+                .overallAttemptsRemaining(maxOverallAttempts)
                 .eligibleTokens(eligibleTokens)
                 .authenticatedTokens(new ArrayList<>())
                 .requiredTokensForFullAuth(new ArrayList<>(requiredTokens))
