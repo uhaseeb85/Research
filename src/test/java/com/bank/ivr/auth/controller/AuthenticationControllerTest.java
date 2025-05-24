@@ -5,7 +5,7 @@ import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
-import com.bank.ivr.auth.service.AuthenticationService;
+import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,8 +39,7 @@ class AuthenticationControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
-    private AuthenticationService authenticationService;
+        @MockBean    private AuthenticationOrchestrator authenticationOrchestrator;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -77,7 +76,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your Social Security Number")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -90,7 +89,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
                     .andExpect(jsonPath("$.message", containsString("Social Security Number")));
 
-            verify(authenticationService, times(1)).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator, times(1)).authenticateCustomer(any(AuthenticationRequest.class));
         }
 
         @Test
@@ -102,7 +101,7 @@ class AuthenticationControllerTest {
                     .message("Customer not found. Please verify your information.")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -133,7 +132,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationService, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
         }
 
         @Test
@@ -154,7 +153,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationService, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
         }
     }
 
@@ -185,7 +184,7 @@ class AuthenticationControllerTest {
                     .requiredTokensRemaining(Arrays.asList("DOB"))
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -223,7 +222,7 @@ class AuthenticationControllerTest {
                     .requiredTokensRemaining(Collections.emptyList())
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -261,7 +260,7 @@ class AuthenticationControllerTest {
                     .remainingAttempts(Map.of("SSN", 2, "overall", 4))
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -294,7 +293,7 @@ class AuthenticationControllerTest {
                     .message("Authentication session expired. Please start over.")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -338,7 +337,7 @@ class AuthenticationControllerTest {
                     .requiredTokensRemaining(Collections.emptyList())
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(step1Response)
                     .thenReturn(step2Response)
                     .thenReturn(step3Response);
@@ -375,7 +374,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.authenticatedTokens.length()", is(2)));
 
             // Verify all service calls were made
-            verify(authenticationService, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
         }
 
         @Test
@@ -401,7 +400,7 @@ class AuthenticationControllerTest {
                     .message("Authentication failed. Maximum attempts exceeded.")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(step1Response)
                     .thenReturn(step2Response)
                     .thenReturn(step3Response);
@@ -433,7 +432,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("FAILED")))
                     .andExpect(jsonPath("$.message", containsString("Maximum attempts exceeded")));
 
-            verify(authenticationService, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
         }
     }
 
@@ -445,7 +444,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle IllegalArgumentException from service")
         void shouldHandleIllegalArgumentException() throws Exception {
             // Given
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenThrow(new IllegalArgumentException("Invalid customer identifier format"));
 
             // When & Then
@@ -462,7 +461,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle unexpected exceptions from service")
         void shouldHandleUnexpectedExceptions() throws Exception {
             // Given
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenThrow(new RuntimeException("Database connection failed"));
 
             // When & Then
@@ -485,7 +484,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationService, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
         }
 
         @Test
@@ -497,7 +496,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isUnsupportedMediaType());
 
-            verify(authenticationService, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
         }
     }
 
@@ -566,7 +565,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your Social Security Number")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -595,7 +594,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your Social Security Number")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -635,7 +634,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationService, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
         }
     }
 
@@ -665,7 +664,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your Social Security Number")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -698,7 +697,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your Social Security Number")
                     .build();
 
-            when(authenticationService.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenReturn(mockResponse);
 
             // When & Then

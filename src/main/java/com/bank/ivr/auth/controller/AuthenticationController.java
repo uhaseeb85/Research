@@ -2,7 +2,7 @@ package com.bank.ivr.auth.controller;
 
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
-import com.bank.ivr.auth.service.AuthenticationService;
+import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +22,7 @@ public class AuthenticationController {
     
     private static final Logger logger = LoggerFactory.getLogger(AuthenticationController.class);
     
-    private final AuthenticationService authenticationService;
-    
-    @Autowired
-    public AuthenticationController(AuthenticationService authenticationService) {
-        this.authenticationService = authenticationService;
+        private final AuthenticationOrchestrator authenticationOrchestrator;        @Autowired    public AuthenticationController(AuthenticationOrchestrator authenticationOrchestrator) {        this.authenticationOrchestrator = authenticationOrchestrator;
     }
     
     /**
@@ -41,7 +37,7 @@ public class AuthenticationController {
         logger.info("Received authentication request for session: {}", request.getSessionId());
         
         try {
-            AuthenticationResponse response = authenticationService.authenticateCustomer(request);
+            AuthenticationResponse response = authenticationOrchestrator.authenticateCustomer(request);
             
             // Log the result (without sensitive data)
             logger.info("Authentication request processed for session: {} with status: {}", 
