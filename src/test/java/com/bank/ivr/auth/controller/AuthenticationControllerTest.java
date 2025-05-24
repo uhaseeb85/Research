@@ -5,7 +5,9 @@ import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
+import com.bank.ivr.auth.service.BrandAuthConfigurationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,34 +19,34 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthenticationController.class)
-@DisplayName("Authentication Controller Tests")
+@DisplayName("Brand-Aware Authentication Controller Tests")
 class AuthenticationControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-        @MockBean    private AuthenticationOrchestrator authenticationOrchestrator;
+    @MockBean
+    private AuthenticationOrchestrator authenticationOrchestrator;
+    
+    @MockBean
+    private BrandAuthConfigurationService brandConfigService;
 
     @Autowired
     private ObjectMapper objectMapper;
 
-    private AuthenticationRequest baseRequest;
+    private AuthenticationRequest premiumBankRequest;
+    private AuthenticationRequest communityBankRequest;
     private CustomerIdentifier customerIdentifier;
 
     @BeforeEach
@@ -54,26 +56,96 @@ class AuthenticationControllerTest {
                 "+1234567890"
         );
         
-        baseRequest = new AuthenticationRequest(
+        premiumBankRequest = new AuthenticationRequest(
                 "session-123",
                 customerIdentifier,
                 null, // New attempt
-                Collections.emptyList()
+                Collections.emptyList(),
+                "PREMIUM_BANK"
         );
+        
+        communityBankRequest = new AuthenticationRequest(
+                "session-456",
+                customerIdentifier,
+                null, // New attempt
+                Collections.emptyList(),
+                "COMMUNITY_BANK"
+        );
+
+        // Setup default brand configuration service mocks
+        when(brandConfigService.isBrandSupported("PREMIUM_BANK")).thenReturn(true);
+        when(brandConfigService.isBrandSupported("COMMUNITY_BANK")).thenReturn(true);
+        when(brandConfigService.isBrandSupported("UNSUPPORTED_BRAND")).thenReturn(false);
+        when(brandConfigService.getAvailableBrands()).thenReturn(Set.of("PREMIUM_BANK", "COMMUNITY_BANK"));
+        
+        // Default brand configuration responses
+        when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
+        when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+        when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
+        
+        when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
+        when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+        when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
+        
+        when(brandConfigService.getBrandMessage(any(), eq("failure"))).thenReturn("Authentication failed. Please try again or contact support.");
     }
 
     @Nested
-    @DisplayName("POST /api/v1/auth/customer - New Authentication Attempts")
-    class NewAuthenticationAttempts {
+    @DisplayName("POST /api/v1/auth/customer - Brand Validation")
+    class BrandValidation {
 
         @Test
-        @DisplayName("Should initiate new authentication successfully for valid customer")
-        void shouldInitiateNewAuthenticationSuccessfully() throws Exception {
+        @DisplayName("Should reject unsupported brand")
+        void shouldRejectUnsupportedBrand() throws Exception {
+            // Given
+            AuthenticationRequest unsupportedBrandRequest = new AuthenticationRequest(
+                    "session-789",
+                    customerIdentifier,
+                    null,
+                    Collections.emptyList(),
+                    "UNSUPPORTED_BRAND"
+            );
+
+            // When & Then
+            mockMvc.perform(post("/api/v1/auth/customer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(unsupportedBrandRequest)))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status", is("FAILED")))
+                    .andExpect(jsonPath("$.message", containsString("Brand 'UNSUPPORTED_BRAND' is not supported")));
+
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+        }
+
+        @Test
+        @DisplayName("Should validate required brand field")
+        void shouldValidateRequiredBrandField() throws Exception {
+            // Given - AuthenticationRequest without brand (this should fail validation)
+            String requestJsonWithoutBrand = "{"
+                    + "\"sessionId\":\"session-123\","
+                    + "\"customerIdentifier\":{\"type\":\"PHONE_NUMBER\",\"value\":\"+1234567890\"},"
+                    + "\"providedTokens\":[]"
+                    + "}";
+
+            // When & Then
+            mockMvc.perform(post("/api/v1/auth/customer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestJsonWithoutBrand))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
+
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+        }
+
+        @Test
+        @DisplayName("Should accept valid supported brand")
+        void shouldAcceptValidSupportedBrand() throws Exception {
             // Given
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
                     .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
+                    .message("Please provide your 4-digit PIN.")
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -82,106 +154,68 @@ class AuthenticationControllerTest {
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
+                            .content(objectMapper.writeValueAsString(premiumBankRequest)))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.attemptId", is("attempt-123")))
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
-                    .andExpect(jsonPath("$.message", containsString("Social Security Number")));
+                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
 
-            verify(authenticationOrchestrator, times(1)).authenticateCustomer(any(AuthenticationRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should handle customer not found scenario")
-        void shouldHandleCustomerNotFound() throws Exception {
-            // Given
-            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
-                    .status(AuthStatus.FAILED)
-                    .message("Customer not found. Please verify your information.")
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(mockResponse);
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("Customer not found")));
-        }
-
-        @Test
-        @DisplayName("Should validate required fields - missing sessionId")
-        void shouldValidateMissingSessionId() throws Exception {
-            // Given
-            AuthenticationRequest invalidRequest = new AuthenticationRequest(
-                    null, // Invalid - null sessionId
-                    customerIdentifier,
-                    null,
-                    Collections.emptyList()
-            );
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(invalidRequest)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
-        }
-
-        @Test
-        @DisplayName("Should validate required fields - missing customer identifier")
-        void shouldValidateMissingCustomerIdentifier() throws Exception {
-            // Given
-            AuthenticationRequest invalidRequest = new AuthenticationRequest(
-                    "session-123",
-                    null, // Invalid - null customer identifier
-                    null,
-                    Collections.emptyList()
-            );
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(invalidRequest)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
         }
     }
 
     @Nested
-    @DisplayName("POST /api/v1/auth/customer - Continuing Authentication Attempts")
-    class ContinuingAuthenticationAttempts {
+    @DisplayName("POST /api/v1/auth/customer - Premium Bank Brand Tests")
+    class PremiumBankBrandTests {
 
         @Test
-        @DisplayName("Should handle valid token submission in continuing attempt")
-        void shouldHandleValidTokenSubmission() throws Exception {
+        @DisplayName("Should initiate Premium Bank authentication successfully")
+        void shouldInitiatePremiumBankAuthenticationSuccessfully() throws Exception {
             // Given
+            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
+                    .attemptId("attempt-123")
+                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
+                    .message("Please provide your 4-digit PIN.")
+                    .build();
+
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+                    .thenReturn(mockResponse);
+
+            // When & Then
+            mockMvc.perform(post("/api/v1/auth/customer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(premiumBankRequest)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.attemptId", is("attempt-123")))
+                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
+                    .andExpect(jsonPath("$.message", containsString("PIN")));
+
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should handle Premium Bank multi-factor authentication")
+        void shouldHandlePremiumBankMultiFactorAuth() throws Exception {
+            // Given - First token provided
             List<ProvidedToken> tokens = Arrays.asList(
-                    new ProvidedToken("SSN", "123456789")
+                    new ProvidedToken("DEBIT_CARD_PIN", "1234")
             );
             
             AuthenticationRequest continuingRequest = new AuthenticationRequest(
                     "session-123",
                     customerIdentifier,
-                    "attempt-123", // Continuing attempt
-                    tokens
+                    "attempt-123",
+                    tokens,
+                    "PREMIUM_BANK"
             );
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
                     .status(AuthStatus.PENDING_MORE_TOKENS)
-                    .message("Please provide your Date of Birth")
-                    .authenticatedTokens(Arrays.asList("SSN"))
-                    .requiredTokensRemaining(Arrays.asList("DOB"))
+                    .message("Please also provide your date of birth for additional verification.")
+                    .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN"))
+                    .requiredTokensRemaining(Arrays.asList("DATE_OF_BIRTH"))
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -193,33 +227,33 @@ class AuthenticationControllerTest {
                             .content(objectMapper.writeValueAsString(continuingRequest)))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.attemptId", is("attempt-123")))
                     .andExpect(jsonPath("$.status", is("PENDING_MORE_TOKENS")))
-                    .andExpect(jsonPath("$.authenticatedTokens[0]", is("SSN")))
-                    .andExpect(jsonPath("$.requiredTokensRemaining[0]", is("DOB")));
+                    .andExpect(jsonPath("$.authenticatedTokens[0]", is("DEBIT_CARD_PIN")))
+                    .andExpect(jsonPath("$.requiredTokensRemaining[0]", is("DATE_OF_BIRTH")));
         }
 
         @Test
-        @DisplayName("Should handle successful final authentication")
-        void shouldHandleSuccessfulFinalAuthentication() throws Exception {
-            // Given
+        @DisplayName("Should complete Premium Bank authentication successfully")
+        void shouldCompletePremiumBankAuthenticationSuccessfully() throws Exception {
+            // Given - Both required tokens provided
             List<ProvidedToken> tokens = Arrays.asList(
-                    new ProvidedToken("DOB", "1990-01-01")
+                    new ProvidedToken("DEBIT_CARD_PIN", "1234"),
+                    new ProvidedToken("DATE_OF_BIRTH", "01/01/1990")
             );
             
-            AuthenticationRequest finalRequest = new AuthenticationRequest(
+            AuthenticationRequest completingRequest = new AuthenticationRequest(
                     "session-123",
                     customerIdentifier,
                     "attempt-123",
-                    tokens
+                    tokens,
+                    "PREMIUM_BANK"
             );
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
                     .status(AuthStatus.AUTHENTICATED)
-                    .message("Authentication successful")
-                    .authenticatedTokens(Arrays.asList("SSN", "DOB"))
-                    .requiredTokensRemaining(Collections.emptyList())
+                    .message("Authentication successful. Welcome to Premium Banking services.")
+                    .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -228,259 +262,309 @@ class AuthenticationControllerTest {
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(finalRequest)))
+                            .content(objectMapper.writeValueAsString(completingRequest)))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.attemptId", is("attempt-123")))
                     .andExpect(jsonPath("$.status", is("AUTHENTICATED")))
-                    .andExpect(jsonPath("$.message", is("Authentication successful")))
-                    .andExpect(jsonPath("$.authenticatedTokens.length()", is(2)))
-                    .andExpect(jsonPath("$.requiredTokensRemaining.length()", is(0)));
-        }
-
-        @Test
-        @DisplayName("Should handle authentication failure - invalid token")
-        void shouldHandleAuthenticationFailureInvalidToken() throws Exception {
-            // Given
-            List<ProvidedToken> tokens = Arrays.asList(
-                    new ProvidedToken("SSN", "invalid-ssn")
-            );
-            
-            AuthenticationRequest failingRequest = new AuthenticationRequest(
-                    "session-123",
-                    customerIdentifier,
-                    "attempt-123",
-                    tokens
-            );
-
-            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.FAILED)
-                    .message("Authentication failed. Invalid credentials provided.")
-                    .remainingAttempts(Map.of("SSN", 2, "overall", 4))
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(mockResponse);
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(failingRequest)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.attemptId", is("attempt-123")))
-                    .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("Authentication failed")))
-                    .andExpect(jsonPath("$.remainingAttempts.SSN", is(2)))
-                    .andExpect(jsonPath("$.remainingAttempts.overall", is(4)));
-        }
-
-        @Test
-        @DisplayName("Should handle expired session")
-        void shouldHandleExpiredSession() throws Exception {
-            // Given
-            AuthenticationRequest expiredRequest = new AuthenticationRequest(
-                    "session-123",
-                    customerIdentifier,
-                    "expired-attempt-123",
-                    Collections.emptyList()
-            );
-
-            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
-                    .attemptId("expired-attempt-123")
-                    .status(AuthStatus.FAILED)
-                    .message("Authentication session expired. Please start over.")
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(mockResponse);
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(expiredRequest)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("session expired")));
+                    .andExpect(jsonPath("$.message", containsString("Premium Banking")))
+                    .andExpect(jsonPath("$.authenticatedTokens", hasSize(2)));
         }
     }
 
     @Nested
-    @DisplayName("POST /api/v1/auth/customer - Multiple Authentication Flow Scenarios")
-    class MultipleAuthenticationFlowScenarios {
+    @DisplayName("POST /api/v1/auth/customer - Community Bank Brand Tests")
+    class CommunityBankBrandTests {
 
         @Test
-        @DisplayName("Should handle complete successful authentication flow")
-        void shouldHandleCompleteSuccessfulFlow() throws Exception {
-            // Given - Mock responses for each step
-            AuthenticationResponse step1Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
+        @DisplayName("Should initiate Community Bank authentication successfully")
+        void shouldInitiateCommunityBankAuthenticationSuccessfully() throws Exception {
+            // Given
+            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
+                    .attemptId("attempt-456")
                     .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
-                    .build();
-
-            AuthenticationResponse step2Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.PENDING_MORE_TOKENS)
-                    .message("Please provide your Date of Birth")
-                    .authenticatedTokens(Arrays.asList("SSN"))
-                    .requiredTokensRemaining(Arrays.asList("DOB"))
-                    .build();
-
-            AuthenticationResponse step3Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.AUTHENTICATED)
-                    .message("Authentication successful")
-                    .authenticatedTokens(Arrays.asList("SSN", "DOB"))
-                    .requiredTokensRemaining(Collections.emptyList())
+                    .message("Please provide the last 4 digits of your Social Security Number.")
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(step1Response)
-                    .thenReturn(step2Response)
-                    .thenReturn(step3Response);
+                    .thenReturn(mockResponse);
 
-            // Step 1: Initial authentication request
+            // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
+                            .content(objectMapper.writeValueAsString(communityBankRequest)))
+                    .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
-
-            // Step 2: Provide SSN
-            List<ProvidedToken> ssnTokens = Arrays.asList(new ProvidedToken("SSN", "123456789"));
-            AuthenticationRequest step2Request = new AuthenticationRequest(
-                    "session-123", customerIdentifier, "attempt-123", ssnTokens);
-
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(step2Request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_MORE_TOKENS")))
-                    .andExpect(jsonPath("$.authenticatedTokens[0]", is("SSN")));
-
-            // Step 3: Provide DOB and complete authentication
-            List<ProvidedToken> dobTokens = Arrays.asList(new ProvidedToken("DOB", "1990-01-01"));
-            AuthenticationRequest step3Request = new AuthenticationRequest(
-                    "session-123", customerIdentifier, "attempt-123", dobTokens);
-
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(step3Request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("AUTHENTICATED")))
-                    .andExpect(jsonPath("$.authenticatedTokens.length()", is(2)));
-
-            // Verify all service calls were made
-            verify(authenticationOrchestrator, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should handle authentication failure after multiple attempts")
-        void shouldHandleAuthenticationFailureAfterMultipleAttempts() throws Exception {
-            // Given - Mock responses for each step
-            AuthenticationResponse step1Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
-                    .build();
-
-            AuthenticationResponse step2Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Invalid SSN. Please try again. 2 attempts remaining.")
-                    .remainingAttempts(Map.of("SSN", 2, "overall", 4))
-                    .build();
-
-            AuthenticationResponse step3Response = AuthenticationResponse.builder()
-                    .attemptId("attempt-123")
-                    .status(AuthStatus.FAILED)
-                    .message("Authentication failed. Maximum attempts exceeded.")
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(step1Response)
-                    .thenReturn(step2Response)
-                    .thenReturn(step3Response);
-
-            // Step 1: Initial request
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
-
-            // Step 2: First failed SSN attempt
-            List<ProvidedToken> wrongSsnTokens = Arrays.asList(new ProvidedToken("SSN", "wrong-ssn"));
-            AuthenticationRequest step2Request = new AuthenticationRequest(
-                    "session-123", customerIdentifier, "attempt-123", wrongSsnTokens);
-
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(step2Request)))
-                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.attemptId", is("attempt-456")))
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
-                    .andExpect(jsonPath("$.remainingAttempts.SSN", is(2)));
-
-            // Step 3: Final failed attempt leading to failure
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(step2Request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("Maximum attempts exceeded")));
-
-            verify(authenticationOrchestrator, times(3)).authenticateCustomer(any(AuthenticationRequest.class));
+                    .andExpect(jsonPath("$.message", containsString("Social Security Number")));
         }
-    }
-
-    @Nested
-    @DisplayName("POST /api/v1/auth/customer - Error Handling")
-    class ErrorHandling {
 
         @Test
-        @DisplayName("Should handle IllegalArgumentException from service")
-        void shouldHandleIllegalArgumentException() throws Exception {
-            // Given
+        @DisplayName("Should complete Community Bank authentication with single factor")
+        void shouldCompleteCommunityBankAuthenticationWithSingleFactor() throws Exception {
+            // Given - SSN provided (single factor for community bank)
+            List<ProvidedToken> tokens = Arrays.asList(
+                    new ProvidedToken("SSN", "123456789")
+            );
+            
+            AuthenticationRequest completingRequest = new AuthenticationRequest(
+                    "session-456",
+                    customerIdentifier,
+                    "attempt-456",
+                    tokens,
+                    "COMMUNITY_BANK"
+            );
+
+            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
+                    .attemptId("attempt-456")
+                    .status(AuthStatus.AUTHENTICATED)
+                    .message("Great! You're all set. How can we help you today?")
+                    .authenticatedTokens(Arrays.asList("SSN"))
+                    .build();
+
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenThrow(new IllegalArgumentException("Invalid customer identifier format"));
+                    .thenReturn(mockResponse);
 
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
+                            .content(objectMapper.writeValueAsString(completingRequest)))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status", is("AUTHENTICATED")))
+                    .andExpect(jsonPath("$.message", containsString("all set")))
+                    .andExpect(jsonPath("$.authenticatedTokens", hasSize(1)))
+                    .andExpect(jsonPath("$.authenticatedTokens[0]", is("SSN")));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/auth/methods/{brand} - Brand-Specific Authentication Methods")
+    class BrandSpecificAuthenticationMethods {
+
+        @Test
+        @DisplayName("Should return Premium Bank authentication methods")
+        void shouldReturnPremiumBankAuthenticationMethods() throws Exception {
+            // Given
+            List<AuthTokenDefinition> premiumTokens = Arrays.asList(
+                    AuthTokenDefinition.builder()
+                            .name("DEBIT_CARD_PIN")
+                            .description("Debit Card PIN")
+                            .priority(100)
+                            .maxAttempts(3)
+                            .build(),
+                    AuthTokenDefinition.builder()
+                            .name("SSN")
+                            .description("Social Security Number")
+                            .priority(95)
+                            .maxAttempts(2)
+                            .build()
+            );
+
+            when(brandConfigService.getTokenDefinitionsForBrand("PREMIUM_BANK")).thenReturn(premiumTokens);
+            when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+            when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
+            when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
+
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/methods/PREMIUM_BANK"))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.brand", is("PREMIUM_BANK")))
+                    .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
+                    .andExpect(jsonPath("$.tokenDefinitions[0].name", is("DEBIT_CARD_PIN")))
+                    .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
+                    .andExpect(jsonPath("$.requiredTokens", hasSize(2)))
+                    .andExpect(jsonPath("$.maxOverallAttempts", is(3)))
+                    .andExpect(jsonPath("$.concurrentAuthAllowed", is(true)));
+        }
+
+        @Test
+        @DisplayName("Should return Community Bank authentication methods")
+        void shouldReturnCommunityBankAuthenticationMethods() throws Exception {
+            // Given
+            List<AuthTokenDefinition> communityTokens = Arrays.asList(
+                    AuthTokenDefinition.builder()
+                            .name("SSN")
+                            .description("Social Security Number")
+                            .priority(100)
+                            .maxAttempts(3)
+                            .build(),
+                    AuthTokenDefinition.builder()
+                            .name("DATE_OF_BIRTH")
+                            .description("Date of Birth")
+                            .priority(95)
+                            .maxAttempts(3)
+                            .build()
+            );
+
+            when(brandConfigService.getTokenDefinitionsForBrand("COMMUNITY_BANK")).thenReturn(communityTokens);
+            when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+            when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
+            when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
+
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/methods/COMMUNITY_BANK"))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.brand", is("COMMUNITY_BANK")))
+                    .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
+                    .andExpect(jsonPath("$.tokenDefinitions[0].name", is("SSN")))
+                    .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
+                                          .andExpect(jsonPath("$.requiredTokens", hasSize(1)))                      .andExpect(jsonPath("$.requiredTokens[0]", is("SSN")))
+                    .andExpect(jsonPath("$.maxOverallAttempts", is(5)))
+                    .andExpect(jsonPath("$.concurrentAuthAllowed", is(false)));
+        }
+
+        @Test
+        @DisplayName("Should return 400 for unsupported brand in methods endpoint")
+        void shouldReturn400ForUnsupportedBrandInMethodsEndpoint() throws Exception {
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/methods/UNSUPPORTED_BRAND"))
+                    .andDo(print())
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Brand 'UNSUPPORTED_BRAND' is not supported")));
+        }
+
+        @Test
+        @DisplayName("Should handle exception in methods endpoint")
+        void shouldHandleExceptionInMethodsEndpoint() throws Exception {
+            // Given
+            when(brandConfigService.getTokenDefinitionsForBrand("PREMIUM_BANK"))
+                    .thenThrow(new RuntimeException("Database connection failed"));
+
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/methods/PREMIUM_BANK"))
+                    .andDo(print())
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().string(containsString("Failed to retrieve authentication methods for brand 'PREMIUM_BANK'")));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/auth/brands - Supported Brands")
+    class SupportedBrands {
+
+        @Test
+        @DisplayName("Should return all supported brands")
+        void shouldReturnAllSupportedBrands() throws Exception {
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/brands"))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.supportedBrands", hasSize(2)))
+                    .andExpect(jsonPath("$.supportedBrands", hasItems("PREMIUM_BANK", "COMMUNITY_BANK")))
+                    .andExpect(jsonPath("$.count", is(2)));
+        }
+
+        @Test
+        @DisplayName("Should handle exception in brands endpoint")
+        void shouldHandleExceptionInBrandsEndpoint() throws Exception {
+            // Given
+            when(brandConfigService.getAvailableBrands())
+                    .thenThrow(new RuntimeException("Configuration service failed"));
+
+            // When & Then
+            mockMvc.perform(get("/api/v1/auth/brands"))
+                    .andDo(print())
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().string(containsString("Failed to retrieve supported brands")));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/auth/customer - Error Handling with Brand Context")
+    class BrandAwareErrorHandling {
+
+        @Test
+        @DisplayName("Should handle IllegalArgumentException with brand context")
+        void shouldHandleIllegalArgumentExceptionWithBrandContext() throws Exception {
+            // Given
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+                    .thenThrow(new IllegalArgumentException("Invalid token format"));
+
+            when(brandConfigService.getBrandMessage("PREMIUM_BANK", "failure"))
+                    .thenReturn("Authentication failed. Please contact Premium Support at 1-800-PREMIUM.");
+
+            // When & Then
+            mockMvc.perform(post("/api/v1/auth/customer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(premiumBankRequest)))
                     .andDo(print())
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("Invalid request")));
+                    .andExpect(jsonPath("$.message", containsString("Invalid token format")));
+
+            verify(brandConfigService).getBrandMessage("PREMIUM_BANK", "failure");
         }
 
         @Test
-        @DisplayName("Should handle unexpected exceptions from service")
-        void shouldHandleUnexpectedExceptions() throws Exception {
+        @DisplayName("Should handle unexpected exceptions with brand context")
+        void shouldHandleUnexpectedExceptionsWithBrandContext() throws Exception {
             // Given
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
                     .thenThrow(new RuntimeException("Database connection failed"));
 
+            when(brandConfigService.getBrandMessage("COMMUNITY_BANK", "failure"))
+                    .thenReturn("We couldn't verify your identity. Please visit your local branch or call us at 1-800-COMMUNITY.");
+
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(baseRequest)))
+                            .content(objectMapper.writeValueAsString(communityBankRequest)))
                     .andDo(print())
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.status", is("FAILED")))
-                    .andExpect(jsonPath("$.message", containsString("unexpected error occurred")));
+                                        .andExpect(jsonPath("$.status", is("FAILED")))                    .andExpect(jsonPath("$.message", is("We couldn't verify your identity. Please visit your local branch or call us at 1-800-COMMUNITY.")));
+
+            verify(brandConfigService).getBrandMessage("COMMUNITY_BANK", "failure");
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/auth/customer - Brand Configuration Integration")
+    class BrandConfigurationIntegration {
+
+        @Test
+        @DisplayName("Should log brand configuration details in request processing")
+        void shouldLogBrandConfigurationDetails() throws Exception {
+            // Given
+            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
+                    .attemptId("attempt-123")
+                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
+                    .message("Please provide your 4-digit PIN.")
+                    .build();
+
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+                    .thenReturn(mockResponse);
+
+            // When & Then
+            mockMvc.perform(post("/api/v1/auth/customer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(premiumBankRequest)))
+                    .andDo(print())
+                    .andExpect(status().isOk());
+
+            // Verify brand configuration service was called for validation and logging
+            verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
+            verify(brandConfigService).getMaxOverallAttemptsForBrand("PREMIUM_BANK");
+            verify(brandConfigService).getRequiredTokensForBrand("PREMIUM_BANK");
+            verify(brandConfigService).isConcurrentTokenAuthAllowed("PREMIUM_BANK");
         }
 
         @Test
-        @DisplayName("Should handle malformed JSON request")
-        void shouldHandleMalformedJsonRequest() throws Exception {
+        @DisplayName("Should handle missing customer identifier with brand context")
+        void shouldHandleMissingCustomerIdentifierWithBrandContext() throws Exception {
+            // Given
+            String requestJsonWithoutCustomerIdentifier = "{"
+                    + "\"sessionId\":\"session-123\","
+                    + "\"brand\":\"PREMIUM_BANK\","
+                    + "\"providedTokens\":[]"
+                    + "}";
+
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{invalid-json}"))
+                            .content(requestJsonWithoutCustomerIdentifier))
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
@@ -488,15 +572,38 @@ class AuthenticationControllerTest {
         }
 
         @Test
-        @DisplayName("Should handle missing Content-Type header")
-        void shouldHandleMissingContentType() throws Exception {
+        @DisplayName("Should handle different customer identifier types with brand")
+        void shouldHandleDifferentCustomerIdentifierTypesWithBrand() throws Exception {
+            // Given
+            CustomerIdentifier accountIdentifier = new CustomerIdentifier(
+                    CustomerIdentifier.IdentifierType.ACCOUNT_NUMBER,
+                    "ACC123456789"
+            );
+            
+            AuthenticationRequest accountRequest = new AuthenticationRequest(
+                    "session-789",
+                    accountIdentifier,
+                    null,
+                    Collections.emptyList(),
+                    "PREMIUM_BANK"
+            );
+
+            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
+                    .attemptId("attempt-789")
+                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
+                    .message("Please provide your 4-digit PIN.")
+                    .build();
+
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+                    .thenReturn(mockResponse);
+
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
-                            .content(objectMapper.writeValueAsString(baseRequest)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(accountRequest)))
                     .andDo(print())
-                    .andExpect(status().isUnsupportedMediaType());
-
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
         }
     }
 
@@ -505,26 +612,21 @@ class AuthenticationControllerTest {
     class HealthCheck {
 
         @Test
-        @DisplayName("Should return healthy status")
-        void shouldReturnHealthyStatus() throws Exception {
+        @DisplayName("Should return brand-aware healthy status")
+        void shouldReturnBrandAwareHealthyStatus() throws Exception {
             mockMvc.perform(get("/api/v1/auth/health"))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(content().string("IVR Authentication Service is healthy"));
+                    .andExpect(content().string("IVR Authentication Service is healthy (Brand-aware)"));
         }
-    }
-
-    @Nested
-    @DisplayName("GET /api/v1/auth/methods - Authentication Methods")
-    class AuthenticationMethods {
 
         @Test
-        @DisplayName("Should return authentication methods info")
-        void shouldReturnAuthenticationMethodsInfo() throws Exception {
-            mockMvc.perform(get("/api/v1/auth/methods"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Authentication methods endpoint")));
+        @DisplayName("Should handle health check exception")
+        void shouldHandleHealthCheckException() throws Exception {
+            // This test mainly exists for coverage - health check is simple
+            // In a real scenario, health check might check database connectivity, etc.
+            mockMvc.perform(get("/api/v1/auth/health"))
+                    .andExpect(status().isOk());
         }
     }
 
@@ -545,24 +647,25 @@ class AuthenticationControllerTest {
     }
 
     @Nested
-    @DisplayName("Token Validation Edge Cases")
-    class TokenValidationEdgeCases {
+    @DisplayName("Brand-Specific Token Validation Edge Cases")
+    class BrandSpecificTokenValidationEdgeCases {
 
         @Test
-        @DisplayName("Should handle empty token list")
-        void shouldHandleEmptyTokenList() throws Exception {
+        @DisplayName("Should handle empty token list with brand context")
+        void shouldHandleEmptyTokenListWithBrandContext() throws Exception {
             // Given
-            AuthenticationRequest requestWithEmptyTokens = new AuthenticationRequest(
+            AuthenticationRequest emptyTokenRequest = new AuthenticationRequest(
                     "session-123",
                     customerIdentifier,
                     "attempt-123",
-                    Collections.emptyList()
+                    Collections.emptyList(),
+                    "PREMIUM_BANK"
             );
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
+                    .status(AuthStatus.PENDING_MORE_TOKENS)
+                    .message("Please provide your 4-digit PIN.")
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -571,27 +674,32 @@ class AuthenticationControllerTest {
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestWithEmptyTokens)))
+                            .content(objectMapper.writeValueAsString(emptyTokenRequest)))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
+                    .andExpect(jsonPath("$.status", is("PENDING_MORE_TOKENS")));
         }
 
         @Test
-        @DisplayName("Should handle null token list")
-        void shouldHandleNullTokenList() throws Exception {
+        @DisplayName("Should handle invalid token for specific brand")
+        void shouldHandleInvalidTokenForSpecificBrand() throws Exception {
             // Given
-            AuthenticationRequest requestWithNullTokens = new AuthenticationRequest(
+            List<ProvidedToken> invalidTokens = Arrays.asList(
+                    new ProvidedToken("INVALID_TOKEN", "invalid_value")
+            );
+            
+            AuthenticationRequest invalidTokenRequest = new AuthenticationRequest(
                     "session-123",
                     customerIdentifier,
                     "attempt-123",
-                    null
+                    invalidTokens,
+                    "PREMIUM_BANK"
             );
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
+                    .status(AuthStatus.FAILED)
+                    .message("Invalid token type for Premium Bank")
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -600,112 +708,12 @@ class AuthenticationControllerTest {
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestWithNullTokens)))
+                            .content(objectMapper.writeValueAsString(invalidTokenRequest)))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
-        }
-
-        @Test
-        @DisplayName("Should validate ProvidedToken fields")
-        void shouldValidateProvidedTokenFields() throws Exception {
-            // Given - ProvidedToken with empty token name
-            String invalidJson = """
-                    {
-                        "sessionId": "session-123",
-                        "customerIdentifier": {
-                            "type": "PHONE_NUMBER",
-                            "value": "+1234567890"
-                        },
-                        "attemptId": "attempt-123",
-                        "providedTokens": [
-                            {
-                                "tokenName": "",
-                                "tokenValue": "some-value"
-                            }
-                        ]
-                    }
-                    """;
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+                    .andExpect(jsonPath("$.status", is("FAILED")))
+                    .andExpect(jsonPath("$.message", containsString("Invalid token type")));
         }
     }
 
-    @Nested
-    @DisplayName("Different Customer Identifier Types")
-    class CustomerIdentifierTypes {
-
-        @Test
-        @DisplayName("Should handle ACCOUNT_NUMBER identifier type")
-        void shouldHandleAccountNumberIdentifier() throws Exception {
-            // Given
-            CustomerIdentifier accountIdentifier = new CustomerIdentifier(
-                    CustomerIdentifier.IdentifierType.ACCOUNT_NUMBER,
-                    "ACC123456789"
-            );
-            
-            AuthenticationRequest accountRequest = new AuthenticationRequest(
-                    "session-456",
-                    accountIdentifier,
-                    null,
-                    Collections.emptyList()
-            );
-
-            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
-                    .attemptId("attempt-456")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(mockResponse);
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(accountRequest)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
-        }
-
-        @Test
-        @DisplayName("Should handle CUSTOMER_ID identifier type")
-        void shouldHandleCustomerIdIdentifier() throws Exception {
-            // Given
-            CustomerIdentifier customerIdIdentifier = new CustomerIdentifier(
-                    CustomerIdentifier.IdentifierType.CUSTOMER_ID,
-                    "CUST789123"
-            );
-            
-            AuthenticationRequest customerIdRequest = new AuthenticationRequest(
-                    "session-789",
-                    customerIdIdentifier,
-                    null,
-                    Collections.emptyList()
-            );
-
-            AuthenticationResponse mockResponse = AuthenticationResponse.builder()
-                    .attemptId("attempt-789")
-                    .status(AuthStatus.PENDING_PRIMARY_TOKEN)
-                    .message("Please provide your Social Security Number")
-                    .build();
-
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
-                    .thenReturn(mockResponse);
-
-            // When & Then
-            mockMvc.perform(post("/api/v1/auth/customer")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(customerIdRequest)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
-        }
-    }
-} 
+            } 

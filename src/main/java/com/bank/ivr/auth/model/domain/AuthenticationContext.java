@@ -22,6 +22,9 @@ public class AuthenticationContext {
     @JsonProperty("customerIdentifier")
     private final CustomerIdentifier customerIdentifier;
     
+    @JsonProperty("brand")
+    private final String brand;
+    
     @JsonProperty("startTime")
     private final LocalDateTime startTime;
     
@@ -54,6 +57,7 @@ public class AuthenticationContext {
             @JsonProperty("attemptId") String attemptId,
             @JsonProperty("sessionId") String sessionId,
             @JsonProperty("customerIdentifier") CustomerIdentifier customerIdentifier,
+            @JsonProperty("brand") String brand,
             @JsonProperty("startTime") LocalDateTime startTime,
             @JsonProperty("tokenAttemptsRemaining") Map<String, Integer> tokenAttemptsRemaining,
             @JsonProperty("overallAttemptsRemaining") int overallAttemptsRemaining,
@@ -66,6 +70,7 @@ public class AuthenticationContext {
         this.attemptId = attemptId;
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
+        this.brand = brand;
         this.startTime = startTime;
         this.tokenAttemptsRemaining = tokenAttemptsRemaining != null ? tokenAttemptsRemaining : new HashMap<>();
         this.overallAttemptsRemaining = overallAttemptsRemaining;
@@ -82,6 +87,7 @@ public class AuthenticationContext {
         this.attemptId = builder.attemptId;
         this.sessionId = builder.sessionId;
         this.customerIdentifier = builder.customerIdentifier;
+        this.brand = builder.brand;
         this.startTime = builder.startTime;
         this.tokenAttemptsRemaining = builder.tokenAttemptsRemaining;
         this.overallAttemptsRemaining = builder.overallAttemptsRemaining;
@@ -104,6 +110,10 @@ public class AuthenticationContext {
     
     public CustomerIdentifier getCustomerIdentifier() {
         return customerIdentifier;
+    }
+    
+    public String getBrand() {
+        return brand;
     }
     
     public LocalDateTime getStartTime() {
@@ -226,6 +236,7 @@ public class AuthenticationContext {
         private String attemptId;
         private String sessionId;
         private CustomerIdentifier customerIdentifier;
+        private String brand;
         private LocalDateTime startTime;
         private Map<String, Integer> tokenAttemptsRemaining = new HashMap<>();
         private int overallAttemptsRemaining = 5; // default
@@ -248,6 +259,11 @@ public class AuthenticationContext {
         
         public Builder customerIdentifier(CustomerIdentifier customerIdentifier) {
             this.customerIdentifier = customerIdentifier;
+            return this;
+        }
+        
+        public Builder brand(String brand) {
+            this.brand = brand;
             return this;
         }
         
@@ -313,6 +329,7 @@ public class AuthenticationContext {
                "attemptId='" + attemptId + '\'' +
                ", sessionId='" + sessionId + '\'' +
                ", customerIdentifier=" + customerIdentifier +
+               ", brand='" + brand + '\'' +
                ", startTime=" + startTime +
                ", tokenAttemptsRemaining=" + tokenAttemptsRemaining +
                ", overallAttemptsRemaining=" + overallAttemptsRemaining +

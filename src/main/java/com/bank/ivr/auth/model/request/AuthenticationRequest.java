@@ -22,16 +22,21 @@ public class AuthenticationRequest {
     @Valid
     private final List<ProvidedToken> providedTokens;
     
+    @NotBlank(message = "Brand is required")
+    private final String brand;
+    
     @JsonCreator
     public AuthenticationRequest(
             @JsonProperty("sessionId") String sessionId,
             @JsonProperty("customerIdentifier") CustomerIdentifier customerIdentifier,
             @JsonProperty("attemptId") String attemptId,
-            @JsonProperty("providedTokens") List<ProvidedToken> providedTokens) {
+            @JsonProperty("providedTokens") List<ProvidedToken> providedTokens,
+            @JsonProperty("brand") String brand) {
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
         this.attemptId = attemptId;
         this.providedTokens = providedTokens;
+        this.brand = brand;
     }
     
     public String getSessionId() {
@@ -50,6 +55,10 @@ public class AuthenticationRequest {
         return providedTokens;
     }
     
+    public String getBrand() {
+        return brand;
+    }
+    
     public boolean isNewAttempt() {
         return attemptId == null || attemptId.trim().isEmpty();
     }
@@ -61,6 +70,7 @@ public class AuthenticationRequest {
                ", customerIdentifier=" + customerIdentifier +
                ", attemptId='" + attemptId + '\'' +
                ", providedTokens=" + providedTokens +
+               ", brand='" + brand + '\'' +
                '}';
     }
 } 
