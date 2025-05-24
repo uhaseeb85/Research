@@ -1,7 +1,6 @@
 package com.bank.ivr.auth.repository.impl;
 
 import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.repository.CustomerProfileRepository;
 import com.bank.ivr.auth.util.EncryptionUtil;
 import org.springframework.stereotype.Repository;
