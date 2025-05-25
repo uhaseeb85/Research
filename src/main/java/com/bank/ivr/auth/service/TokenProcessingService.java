@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service responsible for processing and validating customer-provided tokens.
+ * Now supports brand-aware token validation.
  */
 @Service
 public class TokenProcessingService {
@@ -25,7 +26,7 @@ public class TokenProcessingService {
     }
     
     /**
-     * Processes the tokens provided by the customer.
+     * Processes the tokens provided by the customer using brand-aware validation.
      */
     public void processProvidedTokens(AuthenticationRequest request, AuthenticationContext context, 
                                      CustomerProfile customerProfile) {
@@ -38,9 +39,14 @@ public class TokenProcessingService {
             return;
         }
         
+        String brand = context.getBrand();
+        logger.debug("Processing {} tokens for brand '{}' and attempt '{}'", 
+                    request.getProvidedTokens().size(), brand, context.getAttemptId());
+        
         for (ProvidedToken providedToken : request.getProvidedTokens()) {
             boolean isValid = tokenValidationService.validateToken(
                     providedToken.getTokenName(),
+                    brand,
                     context.getCustomerIdentifier().getValue(),
                     providedToken.getTokenValue(),
                     customerProfile
@@ -48,8 +54,8 @@ public class TokenProcessingService {
             
             if (isValid) {
                 context.addAuthenticatedToken(providedToken.getTokenName());
-                logger.debug("Token {} validated successfully for attempt: {}", 
-                           providedToken.getTokenName(), context.getAttemptId());
+                logger.debug("Token {} validated successfully for brand '{}' and attempt: {}", 
+                           providedToken.getTokenName(), brand, context.getAttemptId());
             } else {
                 context.decrementTokenAttempts(providedToken.getTokenName());
                 context.decrementOverallAttempts();
@@ -59,8 +65,8 @@ public class TokenProcessingService {
                     context.addFailedToken(providedToken.getTokenName());
                 }
                 
-                logger.debug("Token {} validation failed for attempt: {}", 
-                           providedToken.getTokenName(), context.getAttemptId());
+                logger.debug("Token {} validation failed for brand '{}' and attempt: {}", 
+                           providedToken.getTokenName(), brand, context.getAttemptId());
             }
         }
     }

@@ -67,20 +67,27 @@ com.bank.ivr.auth/
 
 ### 1. 🎭 **TokenValidator** - The Strategy Pattern Heart
 
-**What it is**: An interface that defines how to validate any type of authentication token.
+**What it is**: An interface that defines how to validate any type of authentication token for a specific brand.
 
 ```java
 public interface TokenValidator {
     String getTokenName();     // "SSN", "PIN", "DATE_OF_BIRTH"
+    String getBrand();         // "DEFAULT", "COMMUNITY_BANK", "PREMIUM_BANK"
     boolean validate(...);     // Is this token correct?
     String normalizeTokenValue(...); // Clean up input
     int getPriority();         // Which token is most important?
 }
 ```
 
+**🆕 Brand-Aware Validation**: 
+- **One validator per token per brand**: Each brand can have different validation rules
+- **System enforces uniqueness**: Prevents conflicts at startup
+- **Flexible configuration**: Default validators work for all brands, brand-specific when needed
+
 **Why it's brilliant**: 
 - Want to add fingerprint validation? Just create `FingerprintValidator`
 - Need voice recognition? Create `VoiceValidator`
+- Different banks need different rules? Create brand-specific validators
 - Each validator has completely different logic but same interface
 
 **Real Example**:
@@ -90,6 +97,11 @@ public class SsnValidator implements TokenValidator {
     @Override
     public String getTokenName() {
         return "SSN";  // This validator handles SSN tokens
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT";  // Works for all brands unless brand-specific exists
     }
     
     @Override
@@ -108,28 +120,59 @@ public class SsnValidator implements TokenValidator {
 }
 ```
 
+**Brand-Specific Example**:
+```java
+@Component
+public class PremiumBankSsnValidator implements TokenValidator {
+    @Override
+    public String getTokenName() {
+        return "SSN";  // Same token type
+    }
+    
+    @Override
+    public String getBrand() {
+        return "PREMIUM_BANK";  // Only for Premium Bank customers
+    }
+    
+    @Override
+    public boolean validate(String customerId, String providedSSN, CustomerProfile profile) {
+        String cleanSSN = normalizeTokenValue(providedSSN);
+        
+        // Premium Bank: ONLY allow full SSN (more secure, no last-4)
+        return cleanSSN.equals(profile.getSsn());
+    }
+}
+```
+
 ### 2. 🎯 **TokenValidationService** - The Orchestrator
 
-**What it is**: The smart dispatcher that routes tokens to the right validators.
+**What it is**: The smart dispatcher that routes tokens to the right validators based on brand and token type.
 
 ```java
 @Service
 public class TokenValidationService {
     // Spring automatically finds all TokenValidator implementations
-    // and creates this map: {"SSN" -> SsnValidator, "PIN" -> PinValidator}
+    // and creates this map: {"DEFAULT:SSN" -> SsnValidator, "PREMIUM_BANK:SSN" -> PremiumSsnValidator}
     private final Map<String, TokenValidator> validatorMap;
     
-    public boolean validateToken(String tokenName, String value, CustomerProfile profile) {
-        TokenValidator validator = validatorMap.get(tokenName); // Find right validator
+    public boolean validateToken(String tokenName, String brand, String value, CustomerProfile profile) {
+        TokenValidator validator = getValidatorForBrandAndToken(brand, tokenName); // Find right validator
         return validator.validate(customerId, value, profile);   // Use it
     }
 }
 ```
 
+**🆕 Brand-Aware Features**:
+- **Composite Keys**: Uses `brand:token` combinations (e.g., "PREMIUM_BANK:SSN")
+- **Uniqueness Enforcement**: Only one validator per brand+token combination allowed
+- **Fallback Support**: If brand-specific validator not found, tries DEFAULT
+- **Startup Validation**: System fails fast if duplicate validators detected
+
 **Why it's powerful**:
 - **Automatic Discovery**: Spring finds all validators automatically
 - **Fast Lookup**: O(1) performance to find the right validator
-- **Priority Handling**: If two validators handle same token, uses higher priority
+- **Brand Isolation**: Each brand gets its own validation logic
+- **Conflict Prevention**: System prevents validator conflicts at startup
 
 ### 3. 🗂️ **CustomerProfile** - The Data Container
 
@@ -184,6 +227,79 @@ public interface BrandAuthConfiguration {
     Map<String, String> getBrandMessages(); // Custom prompts
 }
 ```
+
+---
+
+## 🏢 Brand-Aware Validation System
+
+### 🎯 The Core Rule: "One Validator Per Token Per Brand"
+
+The system enforces a critical constraint: **there can only be one validator for each token type within each brand**.
+
+### ✅ What's Allowed
+
+```java
+// ✅ GOOD: Same token, different brands
+@Component
+public class DefaultSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "DEFAULT"; }
+}
+
+@Component  
+public class PremiumBankSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }  // Different brand = OK
+}
+```
+
+### ❌ What's Forbidden
+
+```java
+// ❌ BAD: Same token, same brand
+@Component
+public class FirstPremiumSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }
+}
+
+@Component
+public class SecondPremiumSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }  // ❌ DUPLICATE!
+}
+// This will cause IllegalStateException at startup
+```
+
+### 🔍 How It Works
+
+1. **Startup Validation**: System scans all validators and builds composite keys
+2. **Composite Keys**: Each validator gets a unique `brand:token` key (e.g., "PREMIUM_BANK:SSN")
+3. **Conflict Detection**: If duplicate keys found, system fails with clear error message
+4. **Runtime Routing**: Requests use brand+token to find the exact validator needed
+
+### 📋 Validation Examples
+
+```java
+// System creates these mappings:
+"DEFAULT:SSN" → DefaultSsnValidator
+"PREMIUM_BANK:SSN" → PremiumBankSsnValidator  
+"DEFAULT:PIN" → DefaultPinValidator
+"COMMUNITY_BANK:PIN" → CommunityBankPinValidator
+
+// At runtime:
+// Premium Bank customer providing SSN → uses PremiumBankSsnValidator
+// Community Bank customer providing SSN → uses DefaultSsnValidator (fallback)
+// Any customer providing PIN → uses appropriate validator for their brand
+```
+
+### 🛡️ Benefits
+
+- **🔒 Prevents Conflicts**: No ambiguity about which validator to use
+- **🏢 Brand Isolation**: Each brand can have completely different validation rules
+- **🔧 Easy Maintenance**: Clear separation of concerns
+- **⚡ Fast Lookup**: O(1) performance with clear keys
+- **🐛 Early Error Detection**: Problems caught at startup, not runtime
 
 ---
 
@@ -289,6 +405,11 @@ public class DateOfBirthValidator implements TokenValidator {
     }
     
     @Override
+    public String getBrand() {
+        return "DEFAULT";  // Works for all brands unless brand-specific exists
+    }
+    
+    @Override
     public boolean validate(String customerIdentifierValue, 
                            String providedTokenValue, 
                            CustomerProfile customerProfile) {
@@ -354,8 +475,50 @@ public class DateOfBirthValidator implements TokenValidator {
 
 **That's it!** Spring will automatically:
 1. Find your new validator
-2. Add it to the validation map
+2. Add it to the validation map with key "DEFAULT:DATE_OF_BIRTH"
 3. Route "DATE_OF_BIRTH" tokens to your validator
+
+### Creating Brand-Specific Validators
+
+**Example**: Community Bank needs 6-digit PINs instead of 4-digit
+
+```java
+@Component
+public class CommunityBankPinValidator implements TokenValidator {
+    
+    @Override
+    public String getTokenName() {
+        return "DEBIT_CARD_PIN";  // Same token type as default
+    }
+    
+    @Override
+    public String getBrand() {
+        return "COMMUNITY_BANK";  // Brand-specific
+    }
+    
+    @Override
+    public boolean validate(String customerId, String pin, CustomerProfile profile) {
+        String normalizedPin = normalizeTokenValue(pin);
+        
+        // Community Bank requirement: 6 digits instead of 4
+        if (normalizedPin.length() != 6) {
+            logger.debug("Community Bank PIN must be 6 digits, got: {}", normalizedPin.length());
+            return false;
+        }
+        
+        return EncryptionUtil.verifyPin(normalizedPin, profile.getHashedPin());
+    }
+    
+    @Override
+    public String normalizeTokenValue(String pin) {
+        return pin != null ? pin.replaceAll("[^0-9]", "") : null;
+    }
+}
+```
+
+**Result**: System now has two PIN validators:
+- `DEFAULT:DEBIT_CARD_PIN` → 4-digit validation (for most brands)
+- `COMMUNITY_BANK:DEBIT_CARD_PIN` → 6-digit validation (Community Bank only)
 
 ### Adding a New Brand Configuration
 
@@ -466,6 +629,11 @@ public class ZipTransactionValidator implements TokenValidator {
     }
     
     @Override
+    public String getBrand() {
+        return "DEFAULT";  // Available for all brands
+    }
+    
+    @Override
     public boolean validate(String customerId, String providedValue, CustomerProfile profile) {
         // Expected format: "ZIP:AMOUNT" e.g., "12345:25.99"
         String[] parts = providedValue.split(":");
@@ -502,6 +670,11 @@ public class BusinessHoursSsnValidator implements TokenValidator {
     }
     
     @Override
+    public String getBrand() {
+        return "BUSINESS_BANK";  // Only for Business Bank customers
+    }
+    
+    @Override
     public boolean validate(String customerId, String providedSSN, CustomerProfile profile) {
         // Check business hours first
         LocalTime now = LocalTime.now();
@@ -516,7 +689,7 @@ public class BusinessHoursSsnValidator implements TokenValidator {
     
     @Override
     public int getPriority() {
-        return 110; // Higher than normal SSN validator
+        return 110; // Same priority is OK since different brand
     }
 }
 ```
@@ -675,24 +848,44 @@ package com.bank.ivr.auth.validator.impl; // Spring scans this package
 public String getTokenName() {
     return "MY_TOKEN"; // This must match request token name
 }
+
+// ✅ Make sure you implement getBrand() method
+@Override
+public String getBrand() {
+    return "DEFAULT"; // Use "DEFAULT" unless brand-specific
+}
 ```
 
-#### 2. **"Multiple validators found for token"**
+#### 2. **"Multiple validators found for brand 'X' and token 'Y'"**
 
-**Problem**: Two validators claim the same token name.
+**Problem**: Two validators have the same brand and token combination.
 
-**Solution**: Use priority to choose which one wins:
+**Solution**: Each brand+token combination must be unique:
 ```java
+// ❌ BAD: Two validators for same brand+token
 @Component
-public class PrimaryValidator implements TokenValidator {
-    @Override
-    public int getPriority() { return 100; } // Higher wins
+public class FirstSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }
 }
 
-@Component  
-public class BackupValidator implements TokenValidator {
-    @Override
-    public int getPriority() { return 50; } // Lower priority
+@Component
+public class SecondSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }  // ❌ DUPLICATE!
+}
+
+// ✅ GOOD: Different brands or tokens
+@Component
+public class PremiumSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "PREMIUM_BANK"; }
+}
+
+@Component
+public class CommunityPinValidator implements TokenValidator {
+    public String getTokenName() { return "PIN"; }          // Different token
+    public String getBrand() { return "PREMIUM_BANK"; }     // Same brand = OK
 }
 ```
 
@@ -710,6 +903,30 @@ void setUp() {
 }
 ```
 
+#### 3. **"No validator found for brand 'X' and token 'Y'"**
+
+**Problem**: Request includes brand but no brand-specific validator exists.
+
+**Solutions**:
+```java
+// ✅ Check if DEFAULT validator exists as fallback
+@Component
+public class SsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "DEFAULT"; } // Fallback for all brands
+}
+
+// ✅ Or create brand-specific validator
+@Component
+public class MyBrandSsnValidator implements TokenValidator {
+    public String getTokenName() { return "SSN"; }
+    public String getBrand() { return "MY_BRAND"; } // Specific to your brand
+}
+
+// ✅ Check brand name matches exactly (case-sensitive)
+// Request: "PREMIUM_BANK" vs Validator: "premium_bank" = NO MATCH
+```
+
 #### 4. **Authentication always fails**
 
 **Debug checklist**:
@@ -721,9 +938,13 @@ logger.debug("Customer profile: {}", customerProfile);
 String normalized = validator.normalizeTokenValue(providedValue);
 logger.debug("Provided: '{}', Normalized: '{}'", providedValue, normalized);
 
-// ✅ Check validator selection
-TokenValidator validator = tokenValidationService.getValidator(tokenName);
-logger.debug("Using validator: {}", validator.getClass().getSimpleName());
+// ✅ Check validator selection (now includes brand)
+TokenValidator validator = tokenValidationService.getValidator(brand, tokenName);
+logger.debug("Using validator: {} for brand: {}", validator.getClass().getSimpleName(), brand);
+
+// ✅ Check brand mapping
+logger.debug("Available brand+token combinations: {}", 
+            tokenValidationService.getSupportedBrandTokenCombinations());
 ```
 
 ### Debugging Tips

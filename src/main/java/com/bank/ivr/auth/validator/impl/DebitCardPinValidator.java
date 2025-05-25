@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 /**
  * Validator for Debit Card PIN tokens.
  * Uses secure hashing to validate the provided PIN against the stored hash.
+ * This is a default implementation that works for all brands.
  */
 @Component
 public class DebitCardPinValidator implements TokenValidator {
@@ -19,6 +20,11 @@ public class DebitCardPinValidator implements TokenValidator {
     @Override
     public String getTokenName() {
         return "DEBIT_CARD_PIN";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT";
     }
     
     @Override

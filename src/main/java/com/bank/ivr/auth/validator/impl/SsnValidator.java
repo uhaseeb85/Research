@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 /**
  * Validator for Social Security Number (SSN) tokens.
  * Supports full SSN matching and last-4-digits partial matching for security.
+ * This is a default implementation that works for all brands.
  */
 @Component
 public class SsnValidator implements TokenValidator {
@@ -18,6 +19,11 @@ public class SsnValidator implements TokenValidator {
     @Override
     public String getTokenName() {
         return "SSN";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT";
     }
     
     @Override

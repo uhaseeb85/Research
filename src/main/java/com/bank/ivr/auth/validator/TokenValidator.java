@@ -4,7 +4,7 @@ import com.bank.ivr.auth.model.domain.CustomerProfile;
 
 /**
  * Interface for validating specific token values against customer data.
- * Each token type should have its own implementation.
+ * Each token type should have its own implementation per brand.
  */
 public interface TokenValidator {
     
@@ -15,6 +15,14 @@ public interface TokenValidator {
      * @return the token name (e.g., "SSN", "DEBIT_CARD_PIN")
      */
     String getTokenName();
+    
+    /**
+     * Returns the brand code this validator applies to.
+     * This allows for brand-specific validation logic.
+     * 
+     * @return the brand code (e.g., "PREMIUM_BANK", "COMMUNITY_BANK"), or "DEFAULT" for default behavior
+     */
+    String getBrand();
     
     /**
      * Validates the provided token value against the customer's stored data.
