@@ -7,10 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Service for managing token validation operations.
@@ -26,23 +25,29 @@ public class TokenValidationService {
     @Autowired
     public TokenValidationService(List<TokenValidator> validators) {
         // Create a map for efficient validator lookup by token name
-        this.validatorMap = validators.stream()
-                .collect(Collectors.toMap(
-                        TokenValidator::getTokenName,
-                        Function.identity(),
-                        (existing, replacement) -> {
-                            // If there are multiple validators for the same token, choose the one with higher priority
-                            if (existing.getPriority() >= replacement.getPriority()) {
-                                logger.warn("Multiple validators found for token '{}'. Using validator with priority {}",
-                                          existing.getTokenName(), existing.getPriority());
-                                return existing;
-                            } else {
-                                logger.warn("Multiple validators found for token '{}'. Using validator with priority {}",
-                                          replacement.getTokenName(), replacement.getPriority());
-                                return replacement;
-                            }
-                        }
-                ));
+        this.validatorMap = new HashMap<>();
+        
+        // Loop through all validators and build the map
+        for (TokenValidator validator : validators) {
+            String tokenName = validator.getTokenName();
+            TokenValidator existingValidator = validatorMap.get(tokenName);
+            
+            if (existingValidator == null) {
+                // No existing validator for this token, add it
+                validatorMap.put(tokenName, validator);
+            } else {
+                // There's already a validator for this token, choose based on priority
+                if (validator.getPriority() > existingValidator.getPriority()) {
+                    logger.warn("Multiple validators found for token '{}'. Using validator with priority {}",
+                              tokenName, validator.getPriority());
+                    validatorMap.put(tokenName, validator); // Replace with higher priority
+                } else {
+                    logger.warn("Multiple validators found for token '{}'. Using validator with priority {}",
+                              tokenName, existingValidator.getPriority());
+                    // Keep existing validator (higher or equal priority)
+                }
+            }
+        }
         
         logger.info("Initialized TokenValidationService with {} validators: {}", 
                    validatorMap.size(), validatorMap.keySet());

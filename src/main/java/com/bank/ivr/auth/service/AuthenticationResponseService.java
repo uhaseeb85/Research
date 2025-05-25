@@ -11,11 +11,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Service responsible for building brand-aware authentication responses based on context state.
@@ -128,13 +127,39 @@ public class AuthenticationResponseService {
      * Determines the next token to ask for using brand-specific token definitions.
      */
     private AuthTokenDefinition determineNextToken(AuthenticationContext context, List<AuthTokenDefinition> brandTokenDefinitions) {
-        return brandTokenDefinitions.stream()
-                .filter(token -> context.getEligibleTokens().contains(token.getName()))
-                .filter(token -> !context.isTokenAuthenticated(token.getName()))
-                .filter(token -> !context.isTokenFailed(token.getName()))
-                .filter(token -> context.hasRemainingAttemptsForToken(token.getName()))
-                .max(Comparator.comparingInt(AuthTokenDefinition::getPriority))
-                .orElse(null);
+        AuthTokenDefinition bestToken = null;
+        int highestPriority = -1;
+        
+        // Loop through all token definitions to find the best one
+        for (AuthTokenDefinition token : brandTokenDefinitions) {
+            // Check if this token is eligible
+            if (!context.getEligibleTokens().contains(token.getName())) {
+                continue; // Skip this token
+            }
+            
+            // Check if this token is already authenticated
+            if (context.isTokenAuthenticated(token.getName())) {
+                continue; // Skip this token
+            }
+            
+            // Check if this token has failed
+            if (context.isTokenFailed(token.getName())) {
+                continue; // Skip this token
+            }
+            
+            // Check if this token has remaining attempts
+            if (!context.hasRemainingAttemptsForToken(token.getName())) {
+                continue; // Skip this token
+            }
+            
+            // This token is valid, check if it has higher priority
+            if (token.getPriority() > highestPriority) {
+                bestToken = token;
+                highestPriority = token.getPriority();
+            }
+        }
+        
+        return bestToken; // Will be null if no valid token found
     }
     
     /**
@@ -143,13 +168,40 @@ public class AuthenticationResponseService {
     private List<AuthTokenDefinition> determineSecondaryTokens(AuthenticationContext context, 
                                                               AuthTokenDefinition primaryToken,
                                                               List<AuthTokenDefinition> brandTokenDefinitions) {
-        return brandTokenDefinitions.stream()
-                .filter(token -> context.getEligibleTokens().contains(token.getName()))
-                .filter(token -> !context.isTokenAuthenticated(token.getName()))
-                .filter(token -> !context.isTokenFailed(token.getName()))
-                .filter(token -> context.hasRemainingAttemptsForToken(token.getName()))
-                .filter(token -> !token.getName().equals(primaryToken.getName()))
-                .collect(Collectors.toList());
+        List<AuthTokenDefinition> secondaryTokens = new ArrayList<>();
+        
+        // Loop through all token definitions to find valid secondary tokens
+        for (AuthTokenDefinition token : brandTokenDefinitions) {
+            // Skip if not eligible
+            if (!context.getEligibleTokens().contains(token.getName())) {
+                continue;
+            }
+            
+            // Skip if already authenticated
+            if (context.isTokenAuthenticated(token.getName())) {
+                continue;
+            }
+            
+            // Skip if failed
+            if (context.isTokenFailed(token.getName())) {
+                continue;
+            }
+            
+            // Skip if no remaining attempts
+            if (!context.hasRemainingAttemptsForToken(token.getName())) {
+                continue;
+            }
+            
+            // Skip if this is the primary token
+            if (token.getName().equals(primaryToken.getName())) {
+                continue;
+            }
+            
+            // This token is valid as a secondary token
+            secondaryTokens.add(token);
+        }
+        
+        return secondaryTokens;
     }
     
     /**

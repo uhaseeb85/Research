@@ -10,8 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Service for managing brand-specific authentication configurations.
@@ -28,32 +26,59 @@ public class BrandAuthConfigurationService {
     @Autowired
     public BrandAuthConfigurationService(List<BrandAuthConfiguration> configurations) {
         // Create a map for efficient brand lookup
-        this.brandConfigurations = configurations.stream()
-                .collect(Collectors.toMap(
-                        BrandAuthConfiguration::getBrandCode,
-                        Function.identity(),
-                        (existing, replacement) -> {
-                            // If there are multiple configs for the same brand, choose the one with higher priority
-                            if (existing.getPriority() >= replacement.getPriority()) {
-                                logger.warn("Multiple configurations found for brand '{}'. Using config with priority {}",
-                                          existing.getBrandCode(), existing.getPriority());
-                                return existing;
-                            } else {
-                                logger.warn("Multiple configurations found for brand '{}'. Using config with priority {}",
-                                          replacement.getBrandCode(), replacement.getPriority());
-                                return replacement;
-                            }
-                        }
-                ));
+        this.brandConfigurations = new HashMap<>();
+        
+        // Loop through all brand configurations and build the map
+        for (BrandAuthConfiguration config : configurations) {
+            String brandCode = config.getBrandCode();
+            BrandAuthConfiguration existingConfig = brandConfigurations.get(brandCode);
+            
+            if (existingConfig == null) {
+                // No existing config for this brand, add it
+                brandConfigurations.put(brandCode, config);
+            } else {
+                // There's already a config for this brand, choose based on priority
+                if (config.getPriority() > existingConfig.getPriority()) {
+                    logger.warn("Multiple configurations found for brand '{}'. Using config with priority {}",
+                              brandCode, config.getPriority());
+                    brandConfigurations.put(brandCode, config); // Replace with higher priority
+                } else {
+                    logger.warn("Multiple configurations found for brand '{}'. Using config with priority {}",
+                              brandCode, existingConfig.getPriority());
+                    // Keep existing config (higher or equal priority)
+                }
+            }
+        }
         
         // Set default configuration (can be overridden by setting a brand with code "DEFAULT")
-        this.defaultConfiguration = brandConfigurations.getOrDefault("DEFAULT", 
-                brandConfigurations.values().stream()
-                        .min(Comparator.comparingInt(BrandAuthConfiguration::getPriority))
-                        .orElse(null));
+        this.defaultConfiguration = findDefaultConfiguration();
         
         logger.info("Initialized BrandAuthConfigurationService with {} brand configurations: {}", 
                    brandConfigurations.size(), brandConfigurations.keySet());
+    }
+    
+    /**
+     * Finds the default configuration using traditional loop instead of streams.
+     */
+    private BrandAuthConfiguration findDefaultConfiguration() {
+        // Look for explicit default first
+        BrandAuthConfiguration defaultConfig = brandConfigurations.get("DEFAULT");
+        if (defaultConfig != null) {
+            return defaultConfig;
+        }
+        
+        // Find config with lowest priority as fallback
+        BrandAuthConfiguration lowestPriorityConfig = null;
+        int lowestPriority = Integer.MAX_VALUE;
+        
+        for (BrandAuthConfiguration config : brandConfigurations.values()) {
+            if (config.getPriority() < lowestPriority) {
+                lowestPriorityConfig = config;
+                lowestPriority = config.getPriority();
+            }
+        }
+        
+        return lowestPriorityConfig;
     }
     
     /**

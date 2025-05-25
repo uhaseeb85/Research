@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service responsible for determining which authentication tokens a customer is eligible for.
@@ -42,9 +41,12 @@ public class EligibilityService {
         
         // Get brand-specific token definitions to filter eligibility
         List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
-        List<String> brandSupportedTokens = brandTokenDefinitions.stream()
-                .map(AuthTokenDefinition::getName)
-                .collect(Collectors.toList());
+        List<String> brandSupportedTokens = new ArrayList<>();
+        
+        // Extract token names using traditional loop
+        for (AuthTokenDefinition tokenDef : brandTokenDefinitions) {
+            brandSupportedTokens.add(tokenDef.getName());
+        }
         
         logger.debug("Brand '{}' supports tokens: {}", brand, brandSupportedTokens);
         
@@ -105,11 +107,22 @@ public class EligibilityService {
      * Gets all possible token names across all brand configurations.
      */
     private List<String> getAllPossibleTokens() {
-        return brandConfigService.getAvailableBrands().stream()
-                .flatMap(brand -> brandConfigService.getTokenDefinitionsForBrand(brand).stream())
-                .map(AuthTokenDefinition::getName)
-                .distinct()
-                .collect(Collectors.toList());
+        List<String> allTokens = new ArrayList<>();
+        
+        // Loop through all brands and collect their token names
+        for (String brand : brandConfigService.getAvailableBrands()) {
+            List<AuthTokenDefinition> tokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
+            
+            // Add each token name if it's not already in the list
+            for (AuthTokenDefinition tokenDef : tokenDefinitions) {
+                String tokenName = tokenDef.getName();
+                if (!allTokens.contains(tokenName)) {
+                    allTokens.add(tokenName);
+                }
+            }
+        }
+        
+        return allTokens;
     }
     
     /**
