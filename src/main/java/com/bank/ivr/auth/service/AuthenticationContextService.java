@@ -85,6 +85,7 @@ public class AuthenticationContextService {
                 .requiredTokensForFullAuth(new ArrayList<>(requiredTokens))
                 .currentStatus(com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus.PENDING_PRIMARY_TOKEN)
                 .failedTokens(new ArrayList<>())
+                .askedTokens(new ArrayList<>())
                 .build();
     }
     

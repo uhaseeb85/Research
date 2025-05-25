@@ -12,8 +12,9 @@ This comprehensive guide walks you through the process of adding a new bank (bra
 6. [Step 4: Database/Data Model Extensions](#step-4-databasedata-model-extensions)
 7. [Step 5: Testing Your Implementation](#step-5-testing-your-implementation)
 8. [Step 6: Configuration and Deployment](#step-6-configuration-and-deployment)
-9. [Troubleshooting](#troubleshooting)
-10. [Best Practices](#best-practices)
+9. [Smart Token Re-asking Logic](#smart-token-re-asking-logic)
+10. [Troubleshooting](#troubleshooting)
+11. [Best Practices](#best-practices)
 
 ## Overview
 
@@ -744,6 +745,218 @@ mvn package
 java -jar target/bank-ivr-auth-system.jar --spring.profiles.active=prod
 ```
 
+## Smart Token Re-asking Logic
+
+### Overview
+
+The IVR Authentication System includes intelligent token re-asking logic that prevents unnecessary re-prompting of tokens and improves user experience. This system tracks which tokens have been asked and whether users provided them, implementing smart decisions about when to re-ask tokens.
+
+### Key Features
+
+#### 1. **Asked Token Tracking**
+The system tracks all tokens that have been asked during an authentication session:
+
+```java
+// In AuthenticationContext
+private List<String> askedTokens = new ArrayList<>();
+private Map<String, Integer> askedTokensWithValidationFailure = new HashMap<>();
+
+// Methods for tracking
+public void addAskedToken(String tokenName);
+public boolean hasAskedToken(String tokenName);
+public void markAskedTokenValidationFailure(String tokenName);
+public boolean hasAskedTokenValidationFailure(String tokenName);
+```
+
+#### 2. **Smart Re-asking Rules**
+
+The system follows these intelligent rules:
+
+- **✅ Can Re-ask**: Token was asked but user didn't provide it (no validation attempt)
+- **❌ Cannot Re-ask**: Token was asked, user provided it, but validation failed
+- **❌ Cannot Re-ask**: Token has completely failed (exhausted all attempts)
+
+#### 3. **Implementation in Your Brand**
+
+When implementing your brand configuration, consider these re-asking behaviors:
+
+```java
+@Component
+public class TechBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    @Override
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return Arrays.asList(
+            // Primary token - will be asked first
+            AuthTokenDefinition.builder()
+                    .name("MOBILE_PIN")
+                    .description("Mobile Banking PIN")
+                    .priority(150) // Highest priority
+                    .maxAttempts(3)
+                    .build(),
+            
+            // Secondary token - asked if primary fails or as backup
+            AuthTokenDefinition.builder()
+                    .name("BIOMETRIC_ID")
+                    .description("Biometric Authentication")
+                    .priority(140)
+                    .maxAttempts(2)
+                    .build()
+        );
+    }
+}
+```
+
+### Authentication Flow Examples
+
+#### Example 1: User Doesn't Provide Asked Token
+
+```
+1. System asks: "Please provide your Mobile PIN"
+   → Token "MOBILE_PIN" added to askedTokens
+   
+2. User provides: SSN instead of PIN
+   → System validates SSN successfully
+   → MOBILE_PIN can still be re-asked (user never provided it)
+   
+3. System asks: "Please also provide your Mobile PIN for additional security"
+   → Re-asking is allowed because user never attempted PIN
+```
+
+#### Example 2: User Provides Wrong Token
+
+```
+1. System asks: "Please provide your Mobile PIN"
+   → Token "MOBILE_PIN" added to askedTokens
+   
+2. User provides: Wrong PIN "9999"
+   → System validates PIN, fails
+   → MOBILE_PIN marked with validation failure
+   → Cannot re-ask MOBILE_PIN (user provided it but failed)
+   
+3. System asks: "Please provide your Biometric ID"
+   → Moves to next available token
+```
+
+#### Example 3: Token Completely Failed
+
+```
+1. User provides wrong PIN 3 times
+   → PIN exhausts all attempts
+   → PIN added to failedTokens
+   → PIN cannot be re-asked or selected
+   
+2. System excludes PIN from all future selections
+   → Primary token selection skips PIN
+   → Secondary token lists exclude PIN
+```
+
+### Testing Smart Re-asking Logic
+
+When testing your brand implementation, verify these scenarios:
+
+```java
+@Test
+@DisplayName("Should allow re-asking token that was asked but user didn't provide")
+void shouldAllowReAskingUnprovidedToken() {
+    // Given - token was asked but user didn't provide it
+    context.addAskedToken("MOBILE_PIN");
+    // No validation failure marked
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
+    
+    // Then
+    assertEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
+    assertTrue(context.canReAskToken("MOBILE_PIN"));
+}
+
+@Test
+@DisplayName("Should not re-ask token that user provided but failed validation")
+void shouldNotReAskFailedToken() {
+    // Given - token was asked and user provided it but validation failed
+    context.addAskedToken("MOBILE_PIN");
+    context.markAskedTokenValidationFailure("MOBILE_PIN");
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
+    
+    // Then
+    assertNotEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
+    assertFalse(context.canReAskToken("MOBILE_PIN"));
+}
+```
+
+### Configuration Considerations
+
+#### Token Priority Planning
+
+Plan your token priorities considering re-asking logic:
+
+```java
+// High priority tokens will be asked first
+// If they fail validation, system moves to lower priority tokens
+// Plan fallback chains accordingly
+
+AuthTokenDefinition.builder()
+    .name("PRIMARY_TOKEN")
+    .priority(150)  // Asked first
+    .maxAttempts(3)
+    .build(),
+
+AuthTokenDefinition.builder()
+    .name("SECONDARY_TOKEN") 
+    .priority(140)  // Asked if primary fails
+    .maxAttempts(2)
+    .build(),
+
+AuthTokenDefinition.builder()
+    .name("BACKUP_TOKEN")
+    .priority(130)  // Last resort
+    .maxAttempts(3)
+    .build()
+```
+
+#### Required Tokens Strategy
+
+Consider how re-asking logic affects required tokens:
+
+```java
+@Override
+public List<String> getRequiredTokens() {
+    // If a required token fails completely, authentication may fail
+    // Plan alternative required token combinations
+    return Arrays.asList("MOBILE_PIN", "BIOMETRIC_ID"); // Both required
+    
+    // Alternative: Allow either/or
+    // return Arrays.asList("MOBILE_PIN"); // Only one required
+}
+```
+
+### Benefits for Your Brand
+
+1. **Improved User Experience**: Users aren't repeatedly asked for tokens they already failed
+2. **Reduced Frustration**: Smart logic prevents unnecessary re-prompting
+3. **Better Security**: Failed tokens are properly tracked and excluded
+4. **Flexible Authentication**: System adapts to user behavior and token availability
+
+### Integration with Brand Messages
+
+Customize messages based on re-asking context:
+
+```java
+@Override
+public Map<String, String> getBrandMessages() {
+    Map<String, String> messages = new HashMap<>();
+    messages.put("primary_prompt", "Please provide your {token_description}");
+    messages.put("retry_prompt", "Let's try a different method. Please provide your {token_description}");
+    messages.put("alternative_prompt", "For additional security, please also provide your {token_description}");
+    return messages;
+}
+```
+
+The system will automatically choose appropriate messages based on whether a token is being asked for the first time, re-asked, or requested as an alternative.
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -805,6 +1018,7 @@ Before going live, verify:
 - [ ] Logging provides adequate troubleshooting information
 - [ ] Security requirements are met
 - [ ] Performance is acceptable under load
+- [ ] Mock setups in tests use `lenient()` for unused stubs to avoid unnecessary stubbing errors
 
 ## Best Practices
 
@@ -863,6 +1077,7 @@ Before going live, verify:
    - Aim for high test coverage
    - Test both positive and negative cases
    - Include edge cases and error scenarios
+   - Use `lenient()` for mock setups that aren't used in all test methods to avoid unnecessary stubbing errors
 
 ### Maintenance Best Practices
 

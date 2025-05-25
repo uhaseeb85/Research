@@ -2,6 +2,7 @@ package com.bank.ivr.auth.config.impl;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
 import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
 import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 import org.springframework.stereotype.Component;
@@ -163,6 +164,36 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                 .suspiciousActivityThreshold(12) // Higher threshold
                 .retryWindowResetDuration(Duration.ofMinutes(30)) // Faster reset
                 .enableRetryAnalytics(true)
+                .build();
+    }
+    
+    @Override
+    public BrandFailurePolicy getBrandFailurePolicy() {
+        // Community Bank failure policy: Very lenient, try all available methods
+        Map<String, List<String>> tokenAlternatives = new HashMap<>();
+        tokenAlternatives.put("SSN", Arrays.asList("DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME", "ACCOUNT_OPENING_DATE"));
+        tokenAlternatives.put("DATE_OF_BIRTH", Arrays.asList("MOTHER_MAIDEN_NAME", "DEBIT_CARD_PIN", "ACCOUNT_OPENING_DATE"));
+        tokenAlternatives.put("MOTHER_MAIDEN_NAME", Arrays.asList("DATE_OF_BIRTH", "ACCOUNT_OPENING_DATE"));
+        
+        Map<String, List<String>> tokenGroups = new HashMap<>();
+        tokenGroups.put("PERSONAL_INFO", Arrays.asList("SSN", "DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME"));
+        tokenGroups.put("ACCOUNT_INFO", Arrays.asList("DEBIT_CARD_PIN", "ACCOUNT_OPENING_DATE"));
+        
+        return BrandFailurePolicy.builder()
+                .brandCode("COMMUNITY_BANK")
+                .failureStrategy(BrandFailurePolicy.FailureStrategy.REQUIRE_ALL_ATTEMPTED)
+                .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.ANY_REMAINING)
+                .requiredTokenFailureThreshold(3) // Very lenient - allow multiple failures
+                .maxAlternativeAttempts(5) // Many alternative attempts
+                .tokenAlternatives(tokenAlternatives)
+                .tokenGroups(tokenGroups)
+                .fallbackGroups(Arrays.asList("PERSONAL_INFO", "ACCOUNT_INFO"))
+                .criticalTokens(Arrays.asList()) // No critical tokens - very flexible
+                .allowPartialAuthentication(true) // Allow partial auth for community bank
+                .partialAuthMinTokens(1) // Just one token needed for partial
+                .failOnCriticalTokenFailure(false)
+                .enableGracefulDegradation(true)
+                .degradationThreshold(4) // High threshold before degradation
                 .build();
     }
 } 

@@ -39,6 +39,9 @@ public class AuthenticationResponse {
     @JsonProperty("authenticatedTokens")
     private final List<String> authenticatedTokens;
     
+    @JsonProperty("failedTokens")
+    private final List<String> failedTokens;
+    
     private AuthenticationResponse(Builder builder) {
         this.attemptId = builder.attemptId;
         this.status = builder.status;
@@ -48,6 +51,7 @@ public class AuthenticationResponse {
         this.remainingAttempts = builder.remainingAttempts;
         this.requiredTokensRemaining = builder.requiredTokensRemaining;
         this.authenticatedTokens = builder.authenticatedTokens;
+        this.failedTokens = builder.failedTokens;
     }
     
     public String getAttemptId() {
@@ -82,6 +86,10 @@ public class AuthenticationResponse {
         return authenticatedTokens;
     }
     
+    public List<String> getFailedTokens() {
+        return failedTokens;
+    }
+    
     public static Builder builder() {
         return new Builder();
     }
@@ -95,6 +103,7 @@ public class AuthenticationResponse {
         private Map<String, Integer> remainingAttempts;
         private List<String> requiredTokensRemaining;
         private List<String> authenticatedTokens;
+        private List<String> failedTokens;
         
         public Builder attemptId(String attemptId) {
             this.attemptId = attemptId;
@@ -133,6 +142,11 @@ public class AuthenticationResponse {
         
         public Builder authenticatedTokens(List<String> authenticatedTokens) {
             this.authenticatedTokens = authenticatedTokens;
+            return this;
+        }
+        
+        public Builder failedTokens(List<String> failedTokens) {
+            this.failedTokens = failedTokens;
             return this;
         }
         

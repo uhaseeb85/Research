@@ -52,11 +52,17 @@ public class AuthenticationContext {
     @JsonProperty("failedTokens")
     private List<String> failedTokens;
     
+    @JsonProperty("askedTokens")
+    private List<String> askedTokens;
+    
     @JsonProperty("tokenRetryStates")
     private Map<String, TokenRetryState> tokenRetryStates;
     
     @JsonProperty("globalRetryState")
     private GlobalRetryState globalRetryState;
+    
+    @JsonProperty("askedTokensWithValidationFailure")
+    private Map<String, Integer> askedTokensWithValidationFailure;
     
     @JsonCreator
     public AuthenticationContext(
@@ -72,7 +78,9 @@ public class AuthenticationContext {
             @JsonProperty("requiredTokensForFullAuth") List<String> requiredTokensForFullAuth,
             @JsonProperty("lastAskedToken") String lastAskedToken,
             @JsonProperty("currentStatus") AuthStatus currentStatus,
-            @JsonProperty("failedTokens") List<String> failedTokens) {
+            @JsonProperty("failedTokens") List<String> failedTokens,
+            @JsonProperty("askedTokens") List<String> askedTokens,
+            @JsonProperty("askedTokensWithValidationFailure") Map<String, Integer> askedTokensWithValidationFailure) {
         this.attemptId = attemptId;
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
@@ -86,6 +94,8 @@ public class AuthenticationContext {
         this.lastAskedToken = lastAskedToken;
         this.currentStatus = currentStatus;
         this.failedTokens = failedTokens != null ? failedTokens : new ArrayList<>();
+        this.askedTokens = askedTokens != null ? askedTokens : new ArrayList<>();
+        this.askedTokensWithValidationFailure = askedTokensWithValidationFailure != null ? askedTokensWithValidationFailure : new HashMap<>();
     }
     
     // Builder constructor
@@ -103,6 +113,8 @@ public class AuthenticationContext {
         this.lastAskedToken = builder.lastAskedToken;
         this.currentStatus = builder.currentStatus;
         this.failedTokens = builder.failedTokens;
+        this.askedTokens = builder.askedTokens;
+        this.askedTokensWithValidationFailure = builder.askedTokensWithValidationFailure;
     }
     
     // Getters
@@ -158,12 +170,20 @@ public class AuthenticationContext {
         return failedTokens;
     }
     
+    public List<String> getAskedTokens() {
+        return askedTokens;
+    }
+    
     public Map<String, TokenRetryState> getTokenRetryStates() {
         return tokenRetryStates;
     }
     
     public GlobalRetryState getGlobalRetryState() {
         return globalRetryState;
+    }
+    
+    public Map<String, Integer> getAskedTokensWithValidationFailure() {
+        return askedTokensWithValidationFailure;
     }
     
     // Setters for mutable operations
@@ -199,12 +219,20 @@ public class AuthenticationContext {
         this.failedTokens = failedTokens;
     }
     
+    public void setAskedTokens(List<String> askedTokens) {
+        this.askedTokens = askedTokens;
+    }
+    
     public void setTokenRetryStates(Map<String, TokenRetryState> tokenRetryStates) {
         this.tokenRetryStates = tokenRetryStates;
     }
     
     public void setGlobalRetryState(GlobalRetryState globalRetryState) {
         this.globalRetryState = globalRetryState;
+    }
+    
+    public void setAskedTokensWithValidationFailure(Map<String, Integer> askedTokensWithValidationFailure) {
+        this.askedTokensWithValidationFailure = askedTokensWithValidationFailure;
     }
     
     // Helper methods
@@ -250,6 +278,71 @@ public class AuthenticationContext {
         return remaining != null && remaining > 0;
     }
     
+    public void addAskedToken(String tokenName) {
+        if (!askedTokens.contains(tokenName)) {
+            askedTokens.add(tokenName);
+        }
+    }
+    
+    public boolean isTokenAlreadyAsked(String tokenName) {
+        return askedTokens.contains(tokenName);
+    }
+    
+    /**
+     * Records that a token failed validation after being specifically requested.
+     * This is used to prevent re-asking tokens that the user provided but failed validation.
+     */
+    public void markAskedTokenValidationFailure(String tokenName) {
+        askedTokensWithValidationFailure.put(tokenName, 
+            askedTokensWithValidationFailure.getOrDefault(tokenName, 0) + 1);
+    }
+    
+    /**
+     * Checks if a token has failed validation after being specifically asked.
+     * Returns true if the user provided this token in response to our request but it failed validation.
+     */
+    public boolean hasAskedTokenValidationFailure(String tokenName) {
+        return askedTokensWithValidationFailure.containsKey(tokenName) && 
+               askedTokensWithValidationFailure.get(tokenName) > 0;
+    }
+    
+    /**
+     * Gets the number of validation failures for a specific asked token.
+     */
+    public int getAskedTokenValidationFailureCount(String tokenName) {
+        return askedTokensWithValidationFailure.getOrDefault(tokenName, 0);
+    }
+    
+    /**
+     * Determines if a token can be re-asked based on the smart re-asking logic:
+     * - Can re-ask if user didn't provide the token we specifically asked for
+     * - Cannot re-ask if user provided the requested token but it failed validation
+     */
+    public boolean canReAskToken(String tokenName) {
+        // If we haven't asked for this token before, we can ask
+        if (!isTokenAlreadyAsked(tokenName)) {
+            return true;
+        }
+        
+        // If we asked for this token but user didn't provide it (no validation failure recorded),
+        // we can ask again
+        if (!hasAskedTokenValidationFailure(tokenName)) {
+            return true;
+        }
+        
+        // If user provided the token we asked for but it failed validation, don't ask again
+        return false;
+    }
+    
+    /**
+     * Resets the asked tokens list for a new attempt.
+     * This allows asking for the same tokens in a new attempt if appropriate.
+     */
+    public void resetAskedTokensForNewAttempt() {
+        askedTokens.clear();
+        // Note: We keep askedTokensWithValidationFailure to track validation failures across attempts
+    }
+    
     public static Builder builder() {
         return new Builder();
     }
@@ -268,6 +361,8 @@ public class AuthenticationContext {
         private String lastAskedToken;
         private AuthStatus currentStatus = AuthStatus.PENDING_PRIMARY_TOKEN;
         private List<String> failedTokens = new ArrayList<>();
+        private List<String> askedTokens = new ArrayList<>();
+        private Map<String, Integer> askedTokensWithValidationFailure = new HashMap<>();
         
         public Builder attemptId(String attemptId) {
             this.attemptId = attemptId;
@@ -334,6 +429,16 @@ public class AuthenticationContext {
             return this;
         }
         
+        public Builder askedTokens(List<String> askedTokens) {
+            this.askedTokens = askedTokens;
+            return this;
+        }
+        
+        public Builder askedTokensWithValidationFailure(Map<String, Integer> askedTokensWithValidationFailure) {
+            this.askedTokensWithValidationFailure = askedTokensWithValidationFailure;
+            return this;
+        }
+        
         public AuthenticationContext build() {
             if (attemptId == null || sessionId == null || customerIdentifier == null) {
                 throw new IllegalArgumentException("attemptId, sessionId, and customerIdentifier are required");
@@ -361,6 +466,7 @@ public class AuthenticationContext {
                ", lastAskedToken='" + lastAskedToken + '\'' +
                ", currentStatus=" + currentStatus +
                ", failedTokens=" + failedTokens +
+               ", askedTokens=" + askedTokens +
                '}';
     }
 } 

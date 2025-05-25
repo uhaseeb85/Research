@@ -2,6 +2,7 @@ package com.bank.ivr.auth.config.impl;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
 import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
 import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 import org.springframework.stereotype.Component;
@@ -173,6 +174,37 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                 .suspiciousActivityLockoutDuration(Duration.ofMinutes(30))
                 .retryWindowResetDuration(Duration.ofHours(2)) // Longer reset window
                 .enableRetryAnalytics(true)
+                .build();
+    }
+    
+    @Override
+    public BrandFailurePolicy getBrandFailurePolicy() {
+        // Premium Bank failure policy: Allow alternatives but with strict controls
+        Map<String, List<String>> tokenAlternatives = new HashMap<>();
+        tokenAlternatives.put("DEBIT_CARD_PIN", Arrays.asList("SSN", "VOICE_BIOMETRIC"));
+        tokenAlternatives.put("SSN", Arrays.asList("DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME"));
+        tokenAlternatives.put("DATE_OF_BIRTH", Arrays.asList("MOTHER_MAIDEN_NAME", "VOICE_BIOMETRIC"));
+        
+        Map<String, List<String>> tokenGroups = new HashMap<>();
+        tokenGroups.put("PRIMARY_AUTH", Arrays.asList("DEBIT_CARD_PIN", "SSN"));
+        tokenGroups.put("SECONDARY_AUTH", Arrays.asList("DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME"));
+        tokenGroups.put("BIOMETRIC_AUTH", Arrays.asList("VOICE_BIOMETRIC"));
+        
+        return BrandFailurePolicy.builder()
+                .brandCode("PREMIUM_BANK")
+                .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
+                .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PREDEFINED_ALTERNATIVES)
+                .requiredTokenFailureThreshold(1) // Fail if any required token fails completely
+                .maxAlternativeAttempts(2) // Limited alternative attempts for security
+                .tokenAlternatives(tokenAlternatives)
+                .tokenGroups(tokenGroups)
+                .fallbackGroups(Arrays.asList("PRIMARY_AUTH", "SECONDARY_AUTH", "BIOMETRIC_AUTH"))
+                .criticalTokens(Arrays.asList("DEBIT_CARD_PIN")) // PIN is critical
+                .allowPartialAuthentication(false) // Premium requires full auth
+                .partialAuthMinTokens(2)
+                .failOnCriticalTokenFailure(false) // Allow alternatives even if PIN fails
+                .enableGracefulDegradation(true) // Allow graceful fallback
+                .degradationThreshold(2)
                 .build();
     }
 } 

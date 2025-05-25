@@ -6,9 +6,10 @@
 3. [Key Components Explained](#key-components-explained)
 4. [Understanding the Flow](#understanding-the-flow)
 5. [Code Examples](#code-examples)
-6. [How to Add New Features](#how-to-add-new-features)
-7. [Testing Guide](#testing-guide)
-8. [Troubleshooting](#troubleshooting)
+6. [Smart Token Re-asking Logic](#smart-token-re-asking-logic)
+7. [How to Add New Features](#how-to-add-new-features)
+8. [Testing Guide](#testing-guide)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -572,6 +573,217 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
 
 ---
 
+## 🧠 Smart Token Re-asking Logic
+
+### 🎯 What It Does
+
+The system includes intelligent logic that prevents unnecessary re-prompting of tokens and improves user experience. It tracks which tokens have been asked and whether users provided them, making smart decisions about when to re-ask tokens.
+
+### 🔍 Key Concepts
+
+#### 1. **Asked Token Tracking**
+The system tracks every token that has been asked during an authentication session:
+
+```java
+// In AuthenticationContext
+private List<String> askedTokens = new ArrayList<>();
+private Map<String, Integer> askedTokensWithValidationFailure = new HashMap<>();
+
+// Example state during authentication:
+askedTokens: ["SSN", "DEBIT_CARD_PIN"]
+askedTokensWithValidationFailure: {"SSN": 1} // SSN failed once
+```
+
+#### 2. **Smart Re-asking Rules**
+
+The system follows these intelligent rules:
+
+- **✅ Can Re-ask**: Token was asked but user didn't provide it (no validation attempt)
+- **❌ Cannot Re-ask**: Token was asked, user provided it, but validation failed  
+- **❌ Cannot Re-ask**: Token has completely failed (exhausted all attempts)
+
+### 📋 Real-World Examples
+
+#### Example 1: User Doesn't Provide Asked Token ✅
+
+```
+🤖 System: "Please provide your PIN"
+   → PIN added to askedTokens: ["PIN"]
+   
+👤 User: Provides SSN instead: "123456789"
+   → System validates SSN successfully
+   → PIN can still be re-asked (user never attempted PIN)
+   
+🤖 System: "Thank you. Now please also provide your PIN for additional security"
+   → Re-asking is allowed because user never attempted PIN
+```
+
+#### Example 2: User Provides Wrong Token ❌
+
+```
+🤖 System: "Please provide your PIN"
+   → PIN added to askedTokens: ["PIN"]
+   
+👤 User: Provides wrong PIN: "9999"
+   → System validates PIN, fails
+   → PIN marked with validation failure
+   → Cannot re-ask PIN (user provided it but failed)
+   
+🤖 System: "Let's try a different method. Please provide your date of birth"
+   → Moves to next available token
+```
+
+#### Example 3: Token Completely Failed ❌
+
+```
+👤 User: Provides wrong PIN 3 times
+   → PIN exhausts all attempts
+   → PIN added to failedTokens: ["PIN"]
+   → PIN cannot be re-asked or selected
+   
+🤖 System: Excludes PIN from all future selections
+   → Primary token selection skips PIN
+   → Secondary token lists exclude PIN
+```
+
+### 🔧 How It Works in Code
+
+#### AuthenticationContext Methods
+
+```java
+public class AuthenticationContext {
+    // Track which tokens have been asked
+    public void addAskedToken(String tokenName) {
+        if (!askedTokens.contains(tokenName)) {
+            askedTokens.add(tokenName);
+        }
+    }
+    
+    // Mark when user provided token but validation failed
+    public void markAskedTokenValidationFailure(String tokenName) {
+        askedTokensWithValidationFailure.merge(tokenName, 1, Integer::sum);
+    }
+    
+    // Check if token can be re-asked
+    public boolean canReAskToken(String tokenName) {
+        // Cannot re-ask if token completely failed
+        if (isTokenFailed(tokenName)) {
+            return false;
+        }
+        
+        // Cannot re-ask if user provided it but validation failed
+        if (hasAskedTokenValidationFailure(tokenName)) {
+            return false;
+        }
+        
+        // Can re-ask if token was asked but user didn't provide it
+        return true;
+    }
+}
+```
+
+#### Token Selection Logic
+
+```java
+public class AuthenticationResponseService {
+    
+    private AuthTokenDefinition selectNextToken(AuthenticationContext context, List<AuthTokenDefinition> availableTokens) {
+        return availableTokens.stream()
+            .filter(token -> !context.isTokenAuthenticated(token.getName()))  // Skip authenticated
+            .filter(token -> !context.isTokenFailed(token.getName()))         // Skip failed
+            .filter(token -> context.canReAskToken(token.getName()))           // Smart re-asking logic
+            .max(Comparator.comparing(AuthTokenDefinition::getPriority))      // Highest priority
+            .orElse(null);
+    }
+}
+```
+
+### 🧪 Testing Smart Re-asking Logic
+
+When building your own validators and brand configurations, test these scenarios:
+
+```java
+@Test
+@DisplayName("Should allow re-asking token that was asked but user didn't provide")
+void shouldAllowReAskingUnprovidedToken() {
+    // Given - token was asked but user didn't provide it
+    context.addAskedToken("MOBILE_PIN");
+    // No validation failure marked
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
+    
+    // Then
+    assertEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
+    assertTrue(context.canReAskToken("MOBILE_PIN"));
+}
+
+@Test
+@DisplayName("Should not re-ask token that user provided but failed validation")
+void shouldNotReAskFailedToken() {
+    // Given - token was asked and user provided it but validation failed
+    context.addAskedToken("MOBILE_PIN");
+    context.markAskedTokenValidationFailure("MOBILE_PIN");
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
+    
+    // Then
+    assertNotEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
+    assertFalse(context.canReAskToken("MOBILE_PIN"));
+}
+```
+
+### 💡 Benefits for User Experience
+
+1. **🚫 No Repeated Failures**: Users aren't asked again for tokens they already failed
+2. **🔄 Smart Recovery**: System adapts when users provide unexpected tokens
+3. **⚡ Faster Authentication**: Reduces unnecessary back-and-forth
+4. **🎯 Better Flow**: Natural conversation flow based on user behavior
+
+### 🏗️ Implementation in Your Brand
+
+When creating your brand configuration, consider how re-asking logic affects your token strategy:
+
+```java
+@Component
+public class TechBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    @Override
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return Arrays.asList(
+            // Primary token - will be asked first
+            AuthTokenDefinition.builder()
+                    .name("MOBILE_PIN")
+                    .description("Mobile Banking PIN")
+                    .priority(150) // Highest priority
+                    .maxAttempts(3)
+                    .build(),
+            
+            // Secondary token - asked if primary fails
+            AuthTokenDefinition.builder()
+                    .name("BIOMETRIC_ID")
+                    .description("Biometric Authentication")
+                    .priority(140)
+                    .maxAttempts(2)
+                    .build(),
+                    
+            // Backup token - last resort
+            AuthTokenDefinition.builder()
+                    .name("SECURITY_QUESTION")
+                    .description("Security Question Answer")
+                    .priority(130)
+                    .maxAttempts(2)
+                    .build()
+        );
+    }
+}
+```
+
+**Strategy**: Plan your token priorities knowing that if high-priority tokens fail validation, the system will intelligently move to lower-priority alternatives without re-asking failed tokens.
+
+---
+
 ## 🛠️ How to Add New Features
 
 ### 1. Adding a New Token Type
@@ -822,6 +1034,67 @@ class AuthenticationFlowIntegrationTest {
 
 # Run tests with coverage
 ./mvnw test jacoco:report
+```
+
+### Testing Best Practices
+
+#### Avoiding Unnecessary Stubbing Errors
+
+When writing tests with Mockito, you may encounter "UnnecessaryStubbing" errors if you set up mocks that aren't used in all test methods. Use `lenient()` to avoid these errors:
+
+```java
+@ExtendWith(MockitoExtension.class)
+class AuthenticationServiceTest {
+    
+    @Mock
+    private BrandFailurePolicyService failurePolicyService;
+    
+    @BeforeEach
+    void setUp() {
+        // ✅ Use lenient() for mocks that might not be used in all tests
+        lenient().when(failurePolicyService.shouldFailAuthentication(any(), any(), any())).thenReturn(false);
+        lenient().when(failurePolicyService.getNextAlternativeToken(any(), any(), any())).thenReturn(null);
+        
+        // ✅ Don't forget to import lenient
+        // import static org.mockito.Mockito.lenient;
+    }
+}
+```
+
+#### Smart Re-asking Logic Tests
+
+When testing the smart re-asking logic, verify these key scenarios:
+
+```java
+@Test
+@DisplayName("Should allow re-asking token that was asked but user didn't provide")
+void shouldAllowReAskingUnprovidedToken() {
+    // Given - token was asked but user didn't provide it
+    context.addAskedToken("SSN");
+    // No validation failure marked
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TEST_BANK");
+    
+    // Then
+    assertEquals("SSN", response.getPrimaryTokenToAsk().getName());
+    assertTrue(context.canReAskToken("SSN"));
+}
+
+@Test
+@DisplayName("Should not re-ask token that user provided but failed validation")
+void shouldNotReAskFailedToken() {
+    // Given - token was asked and user provided it but validation failed
+    context.addAskedToken("SSN");
+    context.markAskedTokenValidationFailure("SSN");
+    
+    // When
+    AuthenticationResponse response = authService.buildResponse(context, profile, "TEST_BANK");
+    
+    // Then
+    assertNotEquals("SSN", response.getPrimaryTokenToAsk().getName());
+    assertFalse(context.canReAskToken("SSN"));
+}
 ```
 
 ---
