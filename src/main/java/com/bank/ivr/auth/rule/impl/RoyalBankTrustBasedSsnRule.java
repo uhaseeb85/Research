@@ -3,7 +3,7 @@ package com.bank.ivr.auth.rule.impl;
 import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.model.request.TrustLevelInfo;
-import com.bank.ivr.auth.rule.ConditionalAuthenticationRule;
+import com.bank.ivr.auth.rule.TokenSelectionRule;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  * Implements complex logic based on trust level and phone matching status.
  */
 @Component
-public class RoyalBankTrustBasedSsnRule implements ConditionalAuthenticationRule {
+public class RoyalBankTrustBasedSsnRule implements TokenSelectionRule {
     
     private static final String BRAND_CODE = "ROYAL_BANK";
     private static final String SSN_LAST_4 = "SSN_LAST_4";
@@ -102,9 +102,8 @@ public class RoyalBankTrustBasedSsnRule implements ConditionalAuthenticationRule
     }
     
     @Override
-    public boolean evaluate(AuthenticationContext context, CustomerProfile customerProfile) {
-        // This rule is for token selection, not eligibility
-        return isApplicable(context, customerProfile);
+    public String getBrand() {
+        return BRAND_CODE;
     }
     
     @Override
