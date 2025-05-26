@@ -1,8 +1,7 @@
 package com.bank.ivr.auth.rule.impl;
 
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.rule.AuthenticationRule;
+import com.bank.ivr.auth.rule.EligibilityRule;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,13 +9,18 @@ import org.springframework.stereotype.Component;
  * The customer must have an SSN on record and their account must be active.
  */
 @Component
-public class SsnEligibilityRule implements AuthenticationRule {
+public class SsnEligibilityRule implements EligibilityRule {
     
     @Override
-    public boolean evaluate(AuthenticationContext context, CustomerProfile customerProfile) {
+    public boolean isEligible(CustomerProfile customerProfile, String brand) {
         return customerProfile.getSsn() != null 
                && !customerProfile.getSsn().trim().isEmpty()
                && "ACTIVE".equals(customerProfile.getAccountStatus());
+    }
+    
+    @Override
+    public String getTokenName() {
+        return "SSN";
     }
     
     @Override

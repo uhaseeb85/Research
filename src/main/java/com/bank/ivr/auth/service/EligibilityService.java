@@ -2,7 +2,7 @@ package com.bank.ivr.auth.service;
 
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.rule.AuthenticationRule;
+import com.bank.ivr.auth.rule.EligibilityRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +20,12 @@ public class EligibilityService {
     
     private static final Logger logger = LoggerFactory.getLogger(EligibilityService.class);
     
-    private final List<AuthenticationRule> rules;
+    private final List<EligibilityRule> eligibilityRules;
     private final BrandAuthConfigurationService brandConfigService;
     
     @Autowired
-    public EligibilityService(List<AuthenticationRule> rules, BrandAuthConfigurationService brandConfigService) {
-        this.rules = rules;
+    public EligibilityService(List<EligibilityRule> eligibilityRules, BrandAuthConfigurationService brandConfigService) {
+        this.eligibilityRules = eligibilityRules;
         this.brandConfigService = brandConfigService;
     }
     
@@ -50,21 +50,18 @@ public class EligibilityService {
         
         logger.debug("Brand '{}' supports tokens: {}", brand, brandSupportedTokens);
         
-        // Create a temporary context for rule evaluation (rules shouldn't need attemptId/sessionId for eligibility)
-        // We'll use the rules to check eligibility, but only the customer profile based ones
-        for (AuthenticationRule rule : rules) {
+        // Evaluate eligibility rules
+        for (EligibilityRule rule : eligibilityRules) {
             try {
-                // Skip the completion rule as it's not an eligibility rule
-                if ("FULL_AUTHENTICATION_COMPLETION".equals(rule.getRuleName())) {
+                // Check if rule applies to this brand
+                if (!"DEFAULT".equals(rule.getBrand()) && !brand.equals(rule.getBrand())) {
                     continue;
                 }
                 
-                // For eligibility rules, we only need customer profile, not full authentication context
-                // The current eligibility rules (SSN_ELIGIBILITY, DEBIT_CARD_PIN_ELIGIBILITY) don't actually use context
-                boolean isEligible = rule.evaluate(null, customerProfile);
+                boolean isEligible = rule.isEligible(customerProfile, brand);
                 
                 if (isEligible) {
-                    String tokenName = mapRuleNameToTokenName(rule.getRuleName());
+                    String tokenName = rule.getTokenName();
                     if (tokenName != null && brandSupportedTokens.contains(tokenName)) {
                         eligibleTokens.add(tokenName);
                         logger.debug("Customer eligible for {} authentication for brand '{}'", tokenName, brand);
@@ -75,7 +72,7 @@ public class EligibilityService {
                 }
             } catch (Exception e) {
                 // Log the error but continue with other rules
-                logger.error("Error evaluating rule {}: {}", rule.getRuleName(), e.getMessage());
+                logger.error("Error evaluating eligibility rule {}: {}", rule.getRuleName(), e.getMessage());
             }
         }
         
@@ -144,23 +141,5 @@ public class EligibilityService {
         return eligibleTokens;
     }
     
-    /**
-     * Maps rule name to token name for eligibility rules.
-     */
-    private String mapRuleNameToTokenName(String ruleName) {
-        switch (ruleName) {
-            case "SSN_ELIGIBILITY":
-                return "SSN";
-            case "DEBIT_CARD_PIN_ELIGIBILITY":
-                return "DEBIT_CARD_PIN";
-            case "DATE_OF_BIRTH_ELIGIBILITY":
-                return "DATE_OF_BIRTH";
-            case "MOTHER_MAIDEN_NAME_ELIGIBILITY":
-                return "MOTHER_MAIDEN_NAME";
-            case "EMPLOYEE_ID_ELIGIBILITY":
-                return "EMPLOYEE_ID";
-            default:
-                return null;
-        }
-    }
+
 } 

@@ -49,7 +49,7 @@ public class AuthenticationResponseService {
         
         // Check for authentication completion
         FullAuthenticationCompletionRule completionRule = new FullAuthenticationCompletionRule();
-        if (completionRule.evaluate(context, customerProfile)) {
+        if (completionRule.isAuthenticationComplete(context, customerProfile)) {
             context.setCurrentStatus(AuthStatus.AUTHENTICATED);
             contextService.deleteContext(context.getAttemptId());
             

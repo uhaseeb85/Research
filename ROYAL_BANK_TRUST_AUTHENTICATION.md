@@ -39,14 +39,16 @@ public class AuthenticationRequest {
 
 ### 3. Conditional Authentication Rules
 
-The new `ConditionalAuthenticationRule` interface enables complex business logic:
+The new `TokenSelectionRule` interface enables complex business logic:
 
 ```java
-public interface ConditionalAuthenticationRule extends AuthenticationRule {
+public interface TokenSelectionRule {
     String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile);
     boolean isApplicable(AuthenticationContext context, CustomerProfile customerProfile);
     String handleTokenFailure(AuthenticationContext context, CustomerProfile customerProfile, String failedToken);
     String getConditionDescription();
+    String getBrand();
+    int getPriority();
 }
 ```
 
@@ -113,7 +115,7 @@ The system can easily handle hundreds of scenarios by:
 
 ```java
 @Component
-public class RoyalBankAdvancedTrustRule implements ConditionalAuthenticationRule {
+public class RoyalBankAdvancedTrustRule implements TokenSelectionRule {
     
     @Override
     public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
@@ -186,7 +188,7 @@ Rules can be composed dynamically based on multiple factors:
 
 ```java
 @Component
-public class DynamicRoyalBankRule implements ConditionalAuthenticationRule {
+public class DynamicRoyalBankRule implements TokenSelectionRule {
     
     private final List<RuleCondition> ruleConditions;
     
