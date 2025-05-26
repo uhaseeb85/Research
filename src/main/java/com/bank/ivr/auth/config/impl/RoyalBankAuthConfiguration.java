@@ -1,6 +1,5 @@
 package com.bank.ivr.auth.config.impl;
 
-import com.bank.ivr.auth.config.BaseTokenDefinitions;
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
