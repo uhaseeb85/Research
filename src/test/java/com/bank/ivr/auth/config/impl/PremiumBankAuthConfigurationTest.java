@@ -139,7 +139,6 @@ class PremiumBankAuthConfigurationTest {
 
             assertThat(voiceToken.getPriority()).isEqualTo(80);
             assertThat(voiceToken.getDescription()).isEqualTo("Voice Authentication");
-            assertThat(voiceToken.getMaskingRegex()).isEqualTo("(VOICE_MATCH)");
             assertThat(voiceToken.getMaxAttempts()).isEqualTo(2);
         }
 

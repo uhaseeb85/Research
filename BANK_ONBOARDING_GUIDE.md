@@ -313,7 +313,6 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("MOBILE_PIN")
                     .description("Mobile Banking PIN")
                     .priority(150) // Highest priority
-                    .maskingRegex("\\d{4,6}")
                     .inputFormatRegex("^\\d{4,6}$")
                     .maxAttempts(3)
                     .build(),
@@ -323,7 +322,6 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("BIOMETRIC_ID")
                     .description("Biometric Authentication")
                     .priority(120)
-                    .maskingRegex("(BIOMETRIC_MATCH)")
                     .inputFormatRegex("^[A-Z0-9_]+$")
                     .maxAttempts(2)
                     .build(),
@@ -333,7 +331,6 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("ACCOUNT_NUMBER")
                     .description("Account Number")
                     .priority(100)
-                    .maskingRegex("\\d{8,12}")
                     .inputFormatRegex("^\\d{8,12}$")
                     .maxAttempts(3)
                     .build()

@@ -123,7 +123,6 @@ class CommunityBankAuthConfigurationTest {
 
             assertThat(dobToken.getPriority()).isEqualTo(95);
             assertThat(dobToken.getDescription()).isEqualTo("Date of Birth");
-            assertThat(dobToken.getMaskingRegex()).isEqualTo("(\\d{2})/(\\d{2})/(\\d{4})");
             assertThat(dobToken.getInputFormatRegex()).isEqualTo("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$");
         }
 
@@ -141,7 +140,6 @@ class CommunityBankAuthConfigurationTest {
 
             assertThat(accountOpeningToken.getPriority()).isEqualTo(80);
             assertThat(accountOpeningToken.getDescription()).isEqualTo("Account Opening Date");
-            assertThat(accountOpeningToken.getMaskingRegex()).isEqualTo("(\\d{2})/(\\d{4})");
         }
 
         @Test

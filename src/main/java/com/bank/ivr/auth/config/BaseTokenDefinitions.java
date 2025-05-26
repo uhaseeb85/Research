@@ -50,7 +50,6 @@ public class BaseTokenDefinitions {
                 .name(baseToken.getName())
                 .description(baseToken.getDescription())
                 .priority(baseToken.getPriority())
-                .maskingRegex(baseToken.getMaskingRegex())
                 .inputFormatRegex(baseToken.getInputFormatRegex())
                 .maxAttempts(baseToken.getMaxAttempts());
         
@@ -65,9 +64,6 @@ public class BaseTokenDefinitions {
                     break;
                 case "description":
                     builder.description((String) value);
-                    break;
-                case "maskingregex":
-                    builder.maskingRegex((String) value);
                     break;
                 case "inputformatregex":
                     builder.inputFormatRegex((String) value);
@@ -100,7 +96,6 @@ public class BaseTokenDefinitions {
                 .name("SSN")
                 .description("Social Security Number")
                 .priority(90) // Default priority
-                .maskingRegex("\\d{3}-\\d{2}-(\\d{4})")
                 .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
                 .maxAttempts(3) // Default attempts
                 .build());
@@ -110,7 +105,6 @@ public class BaseTokenDefinitions {
                 .name("DATE_OF_BIRTH")
                 .description("Date of Birth")
                 .priority(85)
-                .maskingRegex("(\\d{2})/(\\d{2})/(\\d{4})")
                 .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
                 .maxAttempts(3)
                 .build());
@@ -120,7 +114,6 @@ public class BaseTokenDefinitions {
                 .name("DEBIT_CARD_PIN")
                 .description("Debit Card PIN")
                 .priority(80)
-                .maskingRegex("\\d{4}")
                 .inputFormatRegex("^\\d{4}$")
                 .maxAttempts(3)
                 .build());
@@ -130,7 +123,6 @@ public class BaseTokenDefinitions {
                 .name("MOTHER_MAIDEN_NAME")
                 .description("Mother's Maiden Name")
                 .priority(75)
-                .maskingRegex("(\\w+)")
                 .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
                 .maxAttempts(3)
                 .build());
@@ -140,7 +132,6 @@ public class BaseTokenDefinitions {
                 .name("ACCOUNT_OPENING_DATE")
                 .description("Account Opening Date")
                 .priority(70)
-                .maskingRegex("(\\d{2})/(\\d{4})")
                 .inputFormatRegex("^\\d{2}/\\d{4}$")
                 .maxAttempts(3)
                 .build());
@@ -150,7 +141,6 @@ public class BaseTokenDefinitions {
                 .name("VOICE_BIOMETRIC")
                 .description("Voice Authentication")
                 .priority(65)
-                .maskingRegex("(VOICE_MATCH)")
                 .inputFormatRegex("^VOICE_MATCH$")
                 .maxAttempts(2)
                 .build());
@@ -160,7 +150,6 @@ public class BaseTokenDefinitions {
                 .name("MOBILE_PIN")
                 .description("Mobile Banking PIN")
                 .priority(95)
-                .maskingRegex("\\d{4,6}")
                 .inputFormatRegex("^\\d{4,6}$")
                 .maxAttempts(3)
                 .build());
@@ -170,7 +159,6 @@ public class BaseTokenDefinitions {
                 .name("BIOMETRIC_ID")
                 .description("Biometric Authentication")
                 .priority(90)
-                .maskingRegex("BIO_\\*+")
                 .inputFormatRegex("^BIO_[A-Z0-9]{8,}$")
                 .maxAttempts(2)
                 .build());
@@ -180,7 +168,6 @@ public class BaseTokenDefinitions {
                 .name("ACCOUNT_NUMBER")
                 .description("Account Number")
                 .priority(60)
-                .maskingRegex("\\*{4,8}\\d{4}")
                 .inputFormatRegex("^\\d{8,16}$")
                 .maxAttempts(3)
                 .build());
@@ -190,7 +177,6 @@ public class BaseTokenDefinitions {
                 .name("SECURITY_QUESTION")
                 .description("Security Question Answer")
                 .priority(55)
-                .maskingRegex("\\*{3,}")
                 .inputFormatRegex("^.{3,50}$")
                 .maxAttempts(2)
                 .build());

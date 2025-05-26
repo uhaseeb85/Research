@@ -38,7 +38,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .description("Social Security Number")
                     .priority(100)  // ← Priority determines order
                     .maxAttempts(2)
-                    .maskingRegex("\\d{3}-\\d{2}-\\d{4}")
                     .inputFormatRegex("^\\d{3}-?\\d{2}-?\\d{4}$")
                     .build(),
             
@@ -48,7 +47,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .description("Debit Card PIN")
                     .priority(90)   // ← Lower priority = asked later
                     .maxAttempts(3)
-                    .maskingRegex("\\d{4}")
                     .inputFormatRegex("^\\d{4}$")
                     .build(),
                     
@@ -58,7 +56,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .description("Date of Birth")
                     .priority(80)   // ← Lowest priority
                     .maxAttempts(2)
-                    .maskingRegex("\\d{2}/\\d{2}/\\d{4}")
                     .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$")
                     .build()
         );

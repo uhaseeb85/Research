@@ -522,7 +522,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("SSN")
                     .description("Social Security Number")
                     .priority(100)
-                    .maskingRegex("\\d{4}")  // Only show last 4 digits
                     .inputFormatRegex("^\\d{4,9}$")  // 4-9 digits allowed
                     .maxAttempts(3)
                     .build(),
@@ -531,7 +530,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("DATE_OF_BIRTH")
                     .description("Date of Birth")
                     .priority(90)
-                    .maskingRegex("\\d{2}/\\d{2}/\\d{4}")
                     .inputFormatRegex("^\\d{1,2}/\\d{1,2}/\\d{4}$")
                     .maxAttempts(3)
                     .build()

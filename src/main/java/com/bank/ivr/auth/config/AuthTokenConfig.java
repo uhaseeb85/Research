@@ -23,13 +23,12 @@ public class AuthTokenConfig {
                 .name("SSN")
                 .description("Social Security Number")
                 .priority(100)
-                .maskingRegex("\\d{3}-\\d{2}-(\\d{4})")
                 .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
                 .maxAttempts(3)
                 .build();
     }
     
-    /**
+        /**
      * Defines the Debit Card PIN token configuration.
      */
     @Bean
@@ -38,12 +37,11 @@ public class AuthTokenConfig {
                 .name("DEBIT_CARD_PIN")
                 .description("Debit Card PIN")
                 .priority(90)
-                .maskingRegex("\\d{4}")
                 .inputFormatRegex("^\\d{4}$")
                 .maxAttempts(3)
                 .build();
     }
-    
+
     /**
      * Defines the Date of Birth token configuration.
      */
@@ -53,12 +51,11 @@ public class AuthTokenConfig {
                 .name("DATE_OF_BIRTH")
                 .description("Date of Birth")
                 .priority(80)
-                .maskingRegex("(\\d{2})/(\\d{2})/(\\d{4})")
                 .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
                 .maxAttempts(3)
                 .build();
     }
-    
+
     /**
      * Defines the Mother's Maiden Name token configuration.
      */
@@ -68,12 +65,11 @@ public class AuthTokenConfig {
                 .name("MOTHER_MAIDEN_NAME")
                 .description("Mother's Maiden Name")
                 .priority(70)
-                .maskingRegex("(\\w+)")
                 .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
                 .maxAttempts(3)
                 .build();
     }
-    
+
     /**
      * Defines the Employee ID token configuration.
      */
@@ -83,7 +79,6 @@ public class AuthTokenConfig {
                 .name("EMPLOYEE_ID")
                 .description("Employee ID")
                 .priority(60)
-                .maskingRegex("(\\w+)")
                 .inputFormatRegex("^[a-zA-Z0-9]{3,20}$")
                 .maxAttempts(3)
                 .build();

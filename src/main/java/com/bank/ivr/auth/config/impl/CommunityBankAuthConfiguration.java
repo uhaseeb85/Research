@@ -33,7 +33,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("SSN")
                     .description("Social Security Number")
                     .priority(100) // Highest priority for community bank
-                    .maskingRegex("\\d{3}-\\d{2}-(\\d{4})")
                     .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
                     .maxAttempts(3)
                     .build(),
@@ -42,7 +41,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("DATE_OF_BIRTH")
                     .description("Date of Birth")
                     .priority(95)
-                    .maskingRegex("(\\d{2})/(\\d{2})/(\\d{4})")
                     .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
                     .maxAttempts(3)
                     .build(),
@@ -51,7 +49,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("MOTHER_MAIDEN_NAME")
                     .description("Mother's Maiden Name")
                     .priority(90)
-                    .maskingRegex("(\\w+)")
                     .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
                     .maxAttempts(3)
                     .build(),
@@ -60,7 +57,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("DEBIT_CARD_PIN")
                     .description("Debit Card PIN")
                     .priority(85) // Lower priority for community bank
-                    .maskingRegex("\\d{4}")
                     .inputFormatRegex("^\\d{4}$")
                     .maxAttempts(3)
                     .build(),
@@ -70,7 +66,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("ACCOUNT_OPENING_DATE")
                     .description("Account Opening Date")
                     .priority(80)
-                    .maskingRegex("(\\d{2})/(\\d{4})")
                     .inputFormatRegex("^\\d{2}/\\d{4}$")
                     .maxAttempts(3)
                     .build()

@@ -33,7 +33,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("DEBIT_CARD_PIN")
                     .description("Debit Card PIN")
                     .priority(100) // Highest priority
-                    .maskingRegex("\\d{4}")
                     .inputFormatRegex("^\\d{4}$")
                     .maxAttempts(3)
                     .build(),
@@ -42,7 +41,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("SSN")
                     .description("Social Security Number")
                     .priority(95)
-                    .maskingRegex("\\d{3}-\\d{2}-(\\d{4})")
                     .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
                     .maxAttempts(2) // Stricter for premium
                     .build(),
@@ -51,7 +49,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("DATE_OF_BIRTH")
                     .description("Date of Birth")
                     .priority(90)
-                    .maskingRegex("(\\d{2})/(\\d{2})/(\\d{4})")
                     .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
                     .maxAttempts(3)
                     .build(),
@@ -60,7 +57,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("MOTHER_MAIDEN_NAME")
                     .description("Mother's Maiden Name")
                     .priority(85)
-                    .maskingRegex("(\\w+)")
                     .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
                     .maxAttempts(2)
                     .build(),
@@ -70,7 +66,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                     .name("VOICE_BIOMETRIC")
                     .description("Voice Authentication")
                     .priority(80)
-                    .maskingRegex("(VOICE_MATCH)")
                     .inputFormatRegex("^VOICE_MATCH$")
                     .maxAttempts(2)
                     .build()

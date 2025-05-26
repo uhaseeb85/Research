@@ -34,7 +34,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
                 .priority(100)
                 .maxAttempts(2)
                 .inputFormatRegex("\\d{4}")
-                .maskingRegex("\\d{4}")
                 .build(),
                 
             // Full SSN - for low trust or high risk scenarios
@@ -44,7 +43,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
                 .priority(90)
                 .maxAttempts(2)
                 .inputFormatRegex("\\d{3}-?\\d{2}-?\\d{4}")
-                .maskingRegex("\\d{3}-\\d{2}-(\\d{4})")
                 .build(),
                 
             // Debit Card PIN - alternative authentication method
@@ -54,7 +52,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
                 .priority(80)
                 .maxAttempts(3)
                 .inputFormatRegex("^\\d{4}$")
-                .maskingRegex("\\d{4}")
                 .build(),
             
             // Date of Birth - fallback option
@@ -64,7 +61,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
                 .priority(70)
                 .maxAttempts(2)
                 .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
-                .maskingRegex("(\\d{2})/(\\d{2})/(\\d{4})")
                 .build()
         );
     }
