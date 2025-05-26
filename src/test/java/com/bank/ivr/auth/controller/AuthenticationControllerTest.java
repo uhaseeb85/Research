@@ -83,11 +83,11 @@ class AuthenticationControllerTest {
         
         // Default brand configuration responses
         when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
-        when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+
         when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
         
         when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
-        when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+
         when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
         
         when(brandConfigService.getBrandMessage(any(), eq("failure"))).thenReturn("Authentication failed. Please try again or contact support.");
@@ -214,7 +214,7 @@ class AuthenticationControllerTest {
                     .status(AuthStatus.PENDING_MORE_TOKENS)
                     .message("Please also provide your date of birth for additional verification.")
                     .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN"))
-                    .requiredTokensRemaining(Arrays.asList("DATE_OF_BIRTH"))
+
                     .build();
 
             when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
@@ -228,13 +228,13 @@ class AuthenticationControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("PENDING_MORE_TOKENS")))
                     .andExpect(jsonPath("$.authenticatedTokens[0]", is("DEBIT_CARD_PIN")))
-                    .andExpect(jsonPath("$.requiredTokensRemaining[0]", is("DATE_OF_BIRTH")));
+;
         }
 
         @Test
         @DisplayName("Should complete Premium Bank authentication successfully")
         void shouldCompletePremiumBankAuthenticationSuccessfully() throws Exception {
-            // Given - Both required tokens provided
+            // Given - Both tokens provided
             List<ProvidedToken> tokens = Arrays.asList(
                     new ProvidedToken("DEBIT_CARD_PIN", "1234"),
                     new ProvidedToken("DATE_OF_BIRTH", "01/01/1990")
@@ -349,7 +349,7 @@ class AuthenticationControllerTest {
             );
 
             when(brandConfigService.getTokenDefinitionsForBrand("PREMIUM_BANK")).thenReturn(premiumTokens);
-            when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+
             when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
             when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
 
@@ -361,7 +361,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
                     .andExpect(jsonPath("$.tokenDefinitions[0].name", is("DEBIT_CARD_PIN")))
                     .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
-                    .andExpect(jsonPath("$.requiredTokens", hasSize(2)))
+
                     .andExpect(jsonPath("$.maxOverallAttempts", is(3)))
                     .andExpect(jsonPath("$.concurrentAuthAllowed", is(true)));
         }
@@ -386,7 +386,7 @@ class AuthenticationControllerTest {
             );
 
             when(brandConfigService.getTokenDefinitionsForBrand("COMMUNITY_BANK")).thenReturn(communityTokens);
-            when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+
             when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
             when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
 
@@ -398,7 +398,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
                     .andExpect(jsonPath("$.tokenDefinitions[0].name", is("SSN")))
                     .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
-                                          .andExpect(jsonPath("$.requiredTokens", hasSize(1)))                      .andExpect(jsonPath("$.requiredTokens[0]", is("SSN")))
+
                     .andExpect(jsonPath("$.maxOverallAttempts", is(5)))
                     .andExpect(jsonPath("$.concurrentAuthAllowed", is(false)));
         }

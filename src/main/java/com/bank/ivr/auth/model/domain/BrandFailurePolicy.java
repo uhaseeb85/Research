@@ -14,8 +14,8 @@ import java.util.Objects;
 public class BrandFailurePolicy {
     
     public enum FailureStrategy {
-        FAIL_IMMEDIATELY,           // Fail as soon as any required token fails
-        ALLOW_ALTERNATIVES,         // Try alternative tokens when required tokens fail
+        FAIL_IMMEDIATELY,           // Fail as soon as any critical token fails
+        ALLOW_ALTERNATIVES,         // Try alternative tokens when critical tokens fail
         REQUIRE_ALL_ATTEMPTED,      // Only fail after all eligible tokens have been tried
         PROGRESSIVE_FALLBACK        // Use fallback token groups in order
     }
@@ -36,8 +36,8 @@ public class BrandFailurePolicy {
     @JsonProperty("alternativeTokenStrategy")
     private final AlternativeTokenStrategy alternativeTokenStrategy;
     
-    @JsonProperty("requiredTokenFailureThreshold")
-    private final int requiredTokenFailureThreshold;
+    @JsonProperty("criticalTokenFailureThreshold")
+    private final int criticalTokenFailureThreshold;
     
     @JsonProperty("maxAlternativeAttempts")
     private final int maxAlternativeAttempts;
@@ -74,7 +74,7 @@ public class BrandFailurePolicy {
             @JsonProperty("brandCode") String brandCode,
             @JsonProperty("failureStrategy") FailureStrategy failureStrategy,
             @JsonProperty("alternativeTokenStrategy") AlternativeTokenStrategy alternativeTokenStrategy,
-            @JsonProperty("requiredTokenFailureThreshold") int requiredTokenFailureThreshold,
+            @JsonProperty("criticalTokenFailureThreshold") int criticalTokenFailureThreshold,
             @JsonProperty("maxAlternativeAttempts") int maxAlternativeAttempts,
             @JsonProperty("tokenAlternatives") Map<String, List<String>> tokenAlternatives,
             @JsonProperty("tokenGroups") Map<String, List<String>> tokenGroups,
@@ -88,7 +88,7 @@ public class BrandFailurePolicy {
         this.brandCode = brandCode;
         this.failureStrategy = failureStrategy;
         this.alternativeTokenStrategy = alternativeTokenStrategy;
-        this.requiredTokenFailureThreshold = requiredTokenFailureThreshold;
+        this.criticalTokenFailureThreshold = criticalTokenFailureThreshold;
         this.maxAlternativeAttempts = maxAlternativeAttempts;
         this.tokenAlternatives = tokenAlternatives;
         this.tokenGroups = tokenGroups;
@@ -105,7 +105,7 @@ public class BrandFailurePolicy {
     public String getBrandCode() { return brandCode; }
     public FailureStrategy getFailureStrategy() { return failureStrategy; }
     public AlternativeTokenStrategy getAlternativeTokenStrategy() { return alternativeTokenStrategy; }
-    public int getRequiredTokenFailureThreshold() { return requiredTokenFailureThreshold; }
+    public int getCriticalTokenFailureThreshold() { return criticalTokenFailureThreshold; }
     public int getMaxAlternativeAttempts() { return maxAlternativeAttempts; }
     public Map<String, List<String>> getTokenAlternatives() { return tokenAlternatives; }
     public Map<String, List<String>> getTokenGroups() { return tokenGroups; }
@@ -220,7 +220,7 @@ public class BrandFailurePolicy {
         private String brandCode;
         private FailureStrategy failureStrategy = FailureStrategy.ALLOW_ALTERNATIVES;
         private AlternativeTokenStrategy alternativeTokenStrategy = AlternativeTokenStrategy.PRIORITY_BASED;
-        private int requiredTokenFailureThreshold = 1;
+        private int criticalTokenFailureThreshold = 1;
         private int maxAlternativeAttempts = 3;
         private Map<String, List<String>> tokenAlternatives = Map.of();
         private Map<String, List<String>> tokenGroups = Map.of();
@@ -247,8 +247,8 @@ public class BrandFailurePolicy {
             return this;
         }
         
-        public Builder requiredTokenFailureThreshold(int requiredTokenFailureThreshold) {
-            this.requiredTokenFailureThreshold = requiredTokenFailureThreshold;
+        public Builder criticalTokenFailureThreshold(int criticalTokenFailureThreshold) {
+            this.criticalTokenFailureThreshold = criticalTokenFailureThreshold;
             return this;
         }
         
@@ -304,7 +304,7 @@ public class BrandFailurePolicy {
         
         public BrandFailurePolicy build() {
             return new BrandFailurePolicy(
-                brandCode, failureStrategy, alternativeTokenStrategy, requiredTokenFailureThreshold,
+                brandCode, failureStrategy, alternativeTokenStrategy, criticalTokenFailureThreshold,
                 maxAlternativeAttempts, tokenAlternatives, tokenGroups, fallbackGroups,
                 criticalTokens, allowPartialAuthentication, partialAuthMinTokens,
                 failOnCriticalTokenFailure, enableGracefulDegradation, degradationThreshold

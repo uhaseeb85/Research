@@ -66,7 +66,7 @@ Before starting, ensure you have:
 2. **Database Access**: Ability to modify customer profile schema if needed
 3. **Brand Information**: 
    - Brand code (unique identifier)
-   - Required authentication tokens
+   - Authentication token priorities
    - Security policies and rules
    - Custom messages and prompts
 4. **Test Customer Data**: Sample customer profiles for testing
@@ -88,17 +88,18 @@ Document your bank's authentication strategy:
 
 ```yaml
 Brand: TECH_BANK
-Required Tokens: 
-  - Primary: MOBILE_PIN (4-6 digits)
-  - Secondary: BIOMETRIC_ID or ACCOUNT_NUMBER
-Optional Tokens:
-  - SECURITY_QUESTION
-  - EMAIL_VERIFICATION
+Token Priorities: 
+  - Primary (Priority 150): MOBILE_PIN (4-6 digits)
+  - Secondary (Priority 120): BIOMETRIC_ID 
+  - Fallback (Priority 100): ACCOUNT_NUMBER
+Additional Tokens:
+  - SECURITY_QUESTION (Priority 80)
+  - EMAIL_VERIFICATION (Priority 60)
 Security Policies:
   - Max Overall Attempts: 5
   - Individual Token Attempts: 3
   - Lockout Duration: 15 minutes
-  - Two-Factor Required: Yes
+  - Multi-Factor Preferred: Yes
 ```
 
 ### 1.3 Plan Token Priority
@@ -338,7 +339,7 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
     }
     
     @Override
-    public List<String> getRequiredTokens() {
+    public List<String> getEligibleTokens() {
         // Tech Bank requires mobile PIN and one additional factor
         return Arrays.asList("MOBILE_PIN", "BIOMETRIC_ID");
     }
@@ -440,7 +441,7 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
                 .brandCode("TECH_BANK")
                 .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
                 .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PRIORITY_BASED)
-                .requiredTokenFailureThreshold(2)
+                .criticalTokenFailureThreshold(2)
                 .maxAlternativeAttempts(3)
                 .tokenAlternatives(tokenAlternatives)
                 .tokenGroups(tokenGroups)
@@ -666,9 +667,9 @@ void shouldLoadTechBankConfiguration() {
     // Then
     assertNotNull(config);
     assertEquals("TECH_BANK", config.getBrandCode());
-    assertEquals(2, config.getRequiredTokens().size());
-    assertTrue(config.getRequiredTokens().contains("MOBILE_PIN"));
-    assertTrue(config.getRequiredTokens().contains("BIOMETRIC_ID"));
+    assertEquals(2, config.getEligibleTokens().size());
+    assertTrue(config.getEligibleTokens().contains("MOBILE_PIN"));
+    assertTrue(config.getEligibleTokens().contains("BIOMETRIC_ID"));
 }
 ```
 
@@ -1089,7 +1090,7 @@ import com.bank.ivr.auth.model.domain.CustomerProfile;
 ```java
 // Old (may fail)
 verify(brandConfigService).getMaxOverallAttemptsForBrand("TECH_BANK");
-verify(brandConfigService).getRequiredTokensForBrand("TECH_BANK");
+verify(brandConfigService).getEligibleTokensForBrand("TECH_BANK");
 
 // New (current behavior)
 verify(brandConfigService).isBrandSupported("TECH_BANK");

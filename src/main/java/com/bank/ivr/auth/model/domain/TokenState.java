@@ -20,9 +20,6 @@ public class TokenState {
     @JsonProperty("authenticatedTokens")
     private List<String> authenticatedTokens;
     
-    @JsonProperty("requiredTokensForFullAuth")
-    private List<String> requiredTokensForFullAuth;
-    
     @JsonProperty("failedTokens")
     private List<String> failedTokens;
     
@@ -39,14 +36,12 @@ public class TokenState {
     public TokenState(
             @JsonProperty("eligibleTokens") List<String> eligibleTokens,
             @JsonProperty("authenticatedTokens") List<String> authenticatedTokens,
-            @JsonProperty("requiredTokensForFullAuth") List<String> requiredTokensForFullAuth,
             @JsonProperty("failedTokens") List<String> failedTokens,
             @JsonProperty("askedTokens") List<String> askedTokens,
             @JsonProperty("lastAskedToken") String lastAskedToken,
             @JsonProperty("askedTokensWithValidationFailure") Map<String, Integer> askedTokensWithValidationFailure) {
         this.eligibleTokens = eligibleTokens != null ? eligibleTokens : new ArrayList<>();
         this.authenticatedTokens = authenticatedTokens != null ? authenticatedTokens : new ArrayList<>();
-        this.requiredTokensForFullAuth = requiredTokensForFullAuth != null ? requiredTokensForFullAuth : new ArrayList<>();
         this.failedTokens = failedTokens != null ? failedTokens : new ArrayList<>();
         this.askedTokens = askedTokens != null ? askedTokens : new ArrayList<>();
         this.lastAskedToken = lastAskedToken;
@@ -60,10 +55,6 @@ public class TokenState {
     
     public List<String> getAuthenticatedTokens() {
         return authenticatedTokens;
-    }
-    
-    public List<String> getRequiredTokensForFullAuth() {
-        return requiredTokensForFullAuth;
     }
     
     public List<String> getFailedTokens() {
@@ -89,10 +80,6 @@ public class TokenState {
     
     public void setAuthenticatedTokens(List<String> authenticatedTokens) {
         this.authenticatedTokens = authenticatedTokens;
-    }
-    
-    public void setRequiredTokensForFullAuth(List<String> requiredTokensForFullAuth) {
-        this.requiredTokensForFullAuth = requiredTokensForFullAuth;
     }
     
     public void setFailedTokens(List<String> failedTokens) {
@@ -178,7 +165,6 @@ public class TokenState {
     public static class Builder {
         private List<String> eligibleTokens = new ArrayList<>();
         private List<String> authenticatedTokens = new ArrayList<>();
-        private List<String> requiredTokensForFullAuth = new ArrayList<>();
         private List<String> failedTokens = new ArrayList<>();
         private List<String> askedTokens = new ArrayList<>();
         private String lastAskedToken;
@@ -191,11 +177,6 @@ public class TokenState {
         
         public Builder authenticatedTokens(List<String> authenticatedTokens) {
             this.authenticatedTokens = authenticatedTokens;
-            return this;
-        }
-        
-        public Builder requiredTokensForFullAuth(List<String> requiredTokensForFullAuth) {
-            this.requiredTokensForFullAuth = requiredTokensForFullAuth;
             return this;
         }
         
@@ -220,7 +201,7 @@ public class TokenState {
         }
         
         public TokenState build() {
-            return new TokenState(eligibleTokens, authenticatedTokens, requiredTokensForFullAuth,
+            return new TokenState(eligibleTokens, authenticatedTokens,
                     failedTokens, askedTokens, lastAskedToken, askedTokensWithValidationFailure);
         }
     }

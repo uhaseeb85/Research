@@ -122,7 +122,7 @@ public class AuthenticationController {
             }
             
             var tokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
-            var requiredTokens = brandConfigService.getRequiredTokensForBrand(brand);
+
             var maxAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
             var concurrentAuthAllowed = brandConfigService.isConcurrentTokenAuthAllowed(brand);
             
@@ -134,7 +134,7 @@ public class AuthenticationController {
                     "priority", token.getPriority(),
                     "maxAttempts", token.getMaxAttempts()
                 )).toList(),
-                "requiredTokens", requiredTokens,
+
                 "maxOverallAttempts", maxAttempts,
                 "concurrentAuthAllowed", concurrentAuthAllowed
             );

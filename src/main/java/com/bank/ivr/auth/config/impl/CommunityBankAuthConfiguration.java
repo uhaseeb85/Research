@@ -72,11 +72,7 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Community bank requires only ONE authentication factor (more relaxed)
-        return Arrays.asList("SSN");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -181,7 +177,7 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                 .brandCode("COMMUNITY_BANK")
                 .failureStrategy(BrandFailurePolicy.FailureStrategy.REQUIRE_ALL_ATTEMPTED)
                 .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.ANY_REMAINING)
-                .requiredTokenFailureThreshold(3) // Very lenient - allow multiple failures
+                .criticalTokenFailureThreshold(3) // Very lenient - allow multiple failures
                 .maxAlternativeAttempts(5) // Many alternative attempts
                 .tokenAlternatives(tokenAlternatives)
                 .tokenGroups(tokenGroups)

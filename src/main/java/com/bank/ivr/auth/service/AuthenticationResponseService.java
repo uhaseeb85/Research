@@ -177,7 +177,7 @@ public class AuthenticationResponseService {
                 .primaryTokenToAsk(nextToken)
                 .secondaryTokensAccepted(secondaryTokens)
                 .remainingAttempts(remainingAttempts)
-                .requiredTokensRemaining(context.getRequiredTokensForFullAuth())
+
                 .authenticatedTokens(context.getAuthenticatedTokens())
                 .failedTokens(context.getFailedTokens())
                 .build();

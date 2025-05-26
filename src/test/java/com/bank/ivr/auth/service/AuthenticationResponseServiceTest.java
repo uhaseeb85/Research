@@ -88,7 +88,7 @@ class AuthenticationResponseServiceTest {
                 .overallAttemptsRemaining(5)
                 .eligibleTokens(Arrays.asList("SSN", "DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
                 .authenticatedTokens(new ArrayList<>())
-                .requiredTokensForFullAuth(Arrays.asList("SSN", "DEBIT_CARD_PIN"))
+
                 .currentStatus(AuthStatus.PENDING_PRIMARY_TOKEN)
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())

@@ -289,7 +289,6 @@ public class AuthenticationController {
 public interface BrandAuthConfiguration {
     String getBrandCode();                    // "PREMIUM_BANK"
     List<AuthTokenDefinition> getTokenDefinitions(); // What tokens are available
-    List<String> getRequiredTokens();        // Which tokens are mandatory
     int getMaxOverallAttempts();             // How many tries total
     boolean isConcurrentTokenAuthAllowed();  // Can user provide multiple tokens at once
     Map<String, String> getBrandMessages();  // Custom messages for this bank
@@ -305,11 +304,7 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
         return "PREMIUM_BANK";
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Premium Bank requires both PIN and date of birth
-        return Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -341,9 +336,9 @@ graph TD
     E --> F[Find Customer Profile]
     F --> G{Customer Found?}
     G -->|No| H[Return Customer Not Found]
-    G -->|Yes| I[Determine Required Tokens]
+    G -->|Yes| I[Determine Eligible Tokens]
     I --> J[Validate Provided Tokens]
-    J --> K{All Required Tokens Valid?}
+    J --> K{Sufficient Tokens Valid?}
     K -->|No| L[Ask for More Tokens]
     K -->|Yes| M[Authentication Success]
     L --> N[Smart Re-asking Logic]
@@ -361,8 +356,8 @@ graph TD
    - Normalize input (remove formatting)
    - Validate against stored data
 5. **Decision Making**: 
-   - If all required tokens valid → Success
-   - If missing tokens → Ask for more
+   - If sufficient tokens valid → Success
+   - If more tokens needed → Ask for more
    - If failed tokens → Smart re-asking (won't ask for failed tokens again)
 6. **Response**: Return appropriate response with next steps
 
@@ -387,7 +382,7 @@ graph TD
   "attemptId": "attempt-456",
   "status": "PENDING_PRIMARY_TOKEN",
   "message": "Please provide your 4-digit PIN.",
-  "requiredTokensRemaining": ["DEBIT_CARD_PIN", "DATE_OF_BIRTH"],
+
   "authenticatedTokens": []
 }
 ```
@@ -414,7 +409,7 @@ graph TD
   "attemptId": "attempt-456",
   "status": "PENDING_MORE_TOKENS",
   "message": "Please provide your date of birth in MM/DD/YYYY format.",
-  "requiredTokensRemaining": ["DATE_OF_BIRTH"],
+
   "authenticatedTokens": ["DEBIT_CARD_PIN"]
 }
 ```
@@ -537,7 +532,7 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     }
     
     @Override
-    public List<String> getRequiredTokens() {
+    public List<String> getEligibleTokens() {
         // Community Bank only requires SSN (simpler for customers)
         return Arrays.asList("SSN");
     }
@@ -590,16 +585,16 @@ public class AuthenticationOrchestrator {
         }
         
         // Determine what to ask for next
-        List<String> remainingRequired = getRemainingRequiredTokens(validatedTokens);
+        List<String> remainingEligible = getRemainingEligibleTokens(validatedTokens);
         
         // 🧠 Smart part: Remove failed tokens from consideration
-        remainingRequired.removeAll(failedTokens);
+        remainingEligible.removeAll(failedTokens);
         
-        if (remainingRequired.isEmpty()) {
+        if (remainingEligible.isEmpty()) {
             return AuthenticationResponse.success();
         } else {
             // Ask for next highest priority token that hasn't failed
-            String nextToken = getHighestPriorityToken(remainingRequired);
+            String nextToken = getHighestPriorityToken(remainingEligible);
             return AuthenticationResponse.askForToken(nextToken);
         }
     }
@@ -1077,12 +1072,12 @@ void shouldLoadAllBrandConfigurations() {
 }
 
 @Test
-void shouldReturnCorrectRequiredTokensForBrand() {
+void shouldReturnCorrectEligibleTokensForBrand() {
     // When
-    List<String> requiredTokens = brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK");
+    List<String> eligibleTokens = brandConfigService.getEligibleTokensForBrand("PREMIUM_BANK");
     
     // Then
-    assertThat(requiredTokens).containsExactly("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
+    assertThat(eligibleTokens).containsExactly("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
 }
 ```
 
@@ -1161,7 +1156,7 @@ import com.bank.ivr.auth.model.domain.CustomerProfile;
 ```java
 // Old test (would fail)
 verify(brandConfigService).getMaxOverallAttemptsForBrand("PREMIUM_BANK");
-verify(brandConfigService).getRequiredTokensForBrand("PREMIUM_BANK");
+verify(brandConfigService).getEligibleTokensForBrand("PREMIUM_BANK");
 
 // New test (current behavior)
 verify(brandConfigService).isBrandSupported("PREMIUM_BANK");

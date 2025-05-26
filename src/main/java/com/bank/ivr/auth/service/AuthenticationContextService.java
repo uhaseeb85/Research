@@ -54,9 +54,6 @@ public class AuthenticationContextService {
         // Determine eligible tokens with brand awareness
         List<String> eligibleTokens = eligibilityService.determineEligibleTokens(customerProfile, brand);
         
-        // Get brand-specific required tokens
-        List<String> requiredTokens = brandConfigService.getRequiredTokensForBrand(brand);
-        
         // Get brand-specific token definitions for attempt calculations
         List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
         Map<String, Integer> brandSpecificAttempts = brandConfigService.getBrandSpecificTokenAttempts(brand);
@@ -77,8 +74,8 @@ public class AuthenticationContextService {
         // Get brand-specific overall attempts limit
         int maxOverallAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
         
-        logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, RequiredTokens: {}, MaxOverallAttempts: {}", 
-                    brand, eligibleTokens, requiredTokens, maxOverallAttempts);
+        logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, MaxOverallAttempts: {}", 
+                    brand, eligibleTokens, maxOverallAttempts);
         
         // Create session information
         AuthenticationSession session = AuthenticationSession.builder()
@@ -93,7 +90,7 @@ public class AuthenticationContextService {
         TokenState tokenState = TokenState.builder()
                 .eligibleTokens(eligibleTokens)
                 .authenticatedTokens(new ArrayList<>())
-                .requiredTokensForFullAuth(new ArrayList<>(requiredTokens))
+
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())
                 .build();

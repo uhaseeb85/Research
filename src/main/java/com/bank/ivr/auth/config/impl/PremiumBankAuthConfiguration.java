@@ -72,11 +72,7 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Premium bank requires TWO authentication factors
-        return Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -192,7 +188,7 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                 .brandCode("PREMIUM_BANK")
                 .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
                 .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PREDEFINED_ALTERNATIVES)
-                .requiredTokenFailureThreshold(1) // Fail if any required token fails completely
+                .criticalTokenFailureThreshold(1) // Fail if any critical token fails completely
                 .maxAlternativeAttempts(2) // Limited alternative attempts for security
                 .tokenAlternatives(tokenAlternatives)
                 .tokenGroups(tokenGroups)

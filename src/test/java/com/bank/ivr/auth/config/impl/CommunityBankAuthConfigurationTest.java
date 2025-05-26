@@ -157,21 +157,7 @@ class CommunityBankAuthConfigurationTest {
         }
     }
 
-    @Nested
-    @DisplayName("Required Tokens Tests")
-    class RequiredTokensTests {
 
-        @Test
-        @DisplayName("Should require only SSN for authentication")
-        void shouldRequireOnlySSNForAuthentication() {
-            // When
-            List<String> requiredTokens = config.getRequiredTokens();
-
-            // Then
-            assertThat(requiredTokens).hasSize(1);
-            assertThat(requiredTokens).containsExactly("SSN");
-        }
-    }
 
     @Nested
     @DisplayName("Brand Specific Token Attempts Tests")
@@ -374,18 +360,7 @@ class CommunityBankAuthConfigurationTest {
     @DisplayName("Configuration Consistency Tests")
     class ConfigurationConsistencyTests {
 
-        @Test
-        @DisplayName("Required tokens should exist in token definitions")
-        void requiredTokensShouldExistInTokenDefinitions() {
-            // When
-            List<String> requiredTokens = config.getRequiredTokens();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
 
-            // Then
-            assertThat(definedTokens).containsAll(requiredTokens);
-        }
 
         @Test
         @DisplayName("Brand specific attempts should exist in token definitions")

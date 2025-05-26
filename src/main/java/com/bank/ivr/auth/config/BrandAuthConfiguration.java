@@ -29,13 +29,6 @@ public interface BrandAuthConfiguration {
     List<AuthTokenDefinition> getTokenDefinitions();
     
     /**
-     * Gets the required tokens for full authentication for this brand.
-     * 
-     * @return list of required token names
-     */
-    List<String> getRequiredTokens();
-    
-    /**
      * Gets the maximum overall attempts allowed for this brand.
      * 
      * @return maximum overall attempts

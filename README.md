@@ -86,22 +86,23 @@ Content-Type: application/json
 #### Response Format
 ```json
 {
-  "attemptId": "uuid",
-  "status": "PENDING_PRIMARY_TOKEN|PENDING_MORE_TOKENS|AUTHENTICATED|FAILED",
-  "message": "Please provide your Social Security Number.",
+  "attemptId": "attempt-123",
+  "status": "PENDING_MORE_TOKENS",
+  "message": "Please also provide your date of birth.",
   "primaryTokenToAsk": {
-    "name": "SSN",
-    "description": "Social Security Number",
-    "priority": 100,
-    "maxAttempts": 3
+    "name": "DATE_OF_BIRTH",
+    "description": "Date of Birth",
+    "inputFormatRegex": "^\\d{2}/\\d{2}/\\d{4}$"
   },
-  "secondaryTokensAccepted": [...],
-  "remainingAttempts": {
-    "SSN": 3,
-    "OVERALL": 5
-  },
-  "requiredTokensRemaining": ["SSN"],
-  "authenticatedTokens": []
+  "secondaryTokensAccepted": [
+    {
+      "name": "MOTHER_MAIDEN_NAME",
+      "description": "Mother's Maiden Name"
+    }
+  ],
+  "remainingAttempts": 2,
+  "authenticatedTokens": ["SSN"],
+  "failedTokens": []
 }
 ```
 
@@ -272,11 +273,11 @@ This project provides a robust and flexible IVR authentication service with the 
     *   Maintains authentication context across multiple interactions within a session.
 *   **Configurable Branding**:
     *   Allows defining unique authentication configurations for multiple brands.
-    *   Supports customization of token definitions, required tokens, maximum overall attempts, and concurrent authentication settings per brand.
+    *   Supports customization of token definitions, token priorities, maximum overall attempts, and concurrent authentication settings per brand.
     *   Provides brand-specific messaging for various authentication scenarios (e.g., success, failure, customer not found, session expired).
 *   **API Endpoints**:
     *   `POST /api/v1/auth/customer`: The primary endpoint for authenticating customers. It accepts customer identifiers, provided tokens, and the brand to initiate or continue an authentication attempt.
-    *   `GET /api/v1/auth/methods/{brand}`: Retrieves the available authentication methods and their configurations (e.g., token definitions, required tokens, max attempts) for a specified brand.
+    *   `GET /api/v1/auth/methods/{brand}`: Retrieves the available authentication methods and their configurations (e.g., token definitions, token priorities, max attempts) for a specified brand.
     *   `GET /api/v1/auth/brands`: Lists all supported brands configured in the system.
     *   `GET /api/v1/auth/health`: A standard health check endpoint to verify the service's operational status.
 *   **Comprehensive Logging**:

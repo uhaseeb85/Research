@@ -119,19 +119,7 @@ public class BrandAuthConfigurationService {
         return definitions;
     }
     
-    /**
-     * Gets required tokens for a specific brand.
-     * 
-     * @param brandCode the brand code
-     * @return list of required token names
-     */
-    public List<String> getRequiredTokensForBrand(String brandCode) {
-        BrandAuthConfiguration config = getBrandConfiguration(brandCode);
-        if (config == null) {
-            return Collections.emptyList();
-        }
-        return config.getRequiredTokens();
-    }
+
     
     /**
      * Gets maximum overall attempts for a specific brand.

@@ -86,7 +86,7 @@ class BrandFailurePolicyServiceTest {
                 .tokenAttemptsRemaining(tokenAttempts)
                 .overallAttemptsRemaining(5)
                 .eligibleTokens(Arrays.asList("SSN", "DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
-                .requiredTokensForFullAuth(Arrays.asList("SSN", "DEBIT_CARD_PIN"))
+
                 .currentStatus(AuthStatus.PENDING_PRIMARY_TOKEN)
                 .build();
     }

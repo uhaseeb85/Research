@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Rule to determine if the authentication process is complete.
- * Authentication is considered complete when all required tokens have been successfully validated.
+ * Authentication is considered complete when at least one eligible token has been successfully validated.
  */
 @Component
 public class FullAuthenticationCompletionRule implements TokenSelectionRule {
@@ -28,9 +28,8 @@ public class FullAuthenticationCompletionRule implements TokenSelectionRule {
      * Checks if authentication is complete.
      */
     public boolean isAuthenticationComplete(AuthenticationContext context, CustomerProfile customerProfile) {
-        // Check if all required tokens have been authenticated
-        return context.getRequiredTokensForFullAuth().isEmpty() 
-               || context.getAuthenticatedTokens().containsAll(context.getRequiredTokensForFullAuth());
+        // Authentication is complete when at least one token has been successfully authenticated
+        return !context.getAuthenticatedTokens().isEmpty();
     }
     
     @Override

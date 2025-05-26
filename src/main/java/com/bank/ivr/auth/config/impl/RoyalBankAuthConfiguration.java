@@ -65,11 +65,7 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Royal Bank requires at least one SSN-based authentication
-        return Arrays.asList("SSN_LAST_4", "SSN_FULL");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -142,7 +138,7 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
             .brandCode("ROYAL_BANK")
             .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
             .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PRIORITY_BASED)
-            .requiredTokenFailureThreshold(3)
+                            .criticalTokenFailureThreshold(3)
             .maxAlternativeAttempts(2)
             .allowPartialAuthentication(false)
             .failOnCriticalTokenFailure(true)
