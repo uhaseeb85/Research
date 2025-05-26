@@ -2,7 +2,6 @@
 
 ## 🎯 Two Distinct Rule Types
 
-You're absolutely right that there are **two distinct types of rules** that need to be separated:
 
 ### 1. **Eligibility Rules** - "Can this customer use this token?"
 - **Purpose**: Determine which authentication methods are available to a customer
