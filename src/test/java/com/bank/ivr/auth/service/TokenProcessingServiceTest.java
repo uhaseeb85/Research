@@ -5,6 +5,7 @@ import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,16 @@ class TokenProcessingServiceTest {
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "1234567890"),
                 "test-attempt-123",
                 null, // will be set per test
-                "TEST_BRAND"
+                "TEST_BRAND",
+                createDefaultTrustLevelInfo()
+        );
+    }
+    
+    private TrustLevelInfo createDefaultTrustLevelInfo() {
+        return new TrustLevelInfo(
+                TrustLevelInfo.TrustLevel.GREEN,
+                TrustLevelInfo.PhoneMatchStatus.SINGLE_MATCH,
+                1
         );
     }
 
@@ -81,7 +91,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(pinToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         when(tokenValidationService.validateToken(eq("DEBIT_CARD_PIN"), eq("TEST_BRAND"), 
@@ -108,7 +119,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(ssnToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
@@ -136,7 +148,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(ssnToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
@@ -163,7 +176,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(ssnToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         // Mock that validation succeeds (SSN validator should handle flexible input)
@@ -189,7 +203,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 null,
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         // Act
@@ -248,7 +263,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(ssnToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
@@ -281,7 +297,8 @@ class TokenProcessingServiceTest {
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
                 List.of(ssnToken),
-                request.getBrand()
+                request.getBrand(),
+                request.getTrustLevelInfo()
         );
 
         when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 

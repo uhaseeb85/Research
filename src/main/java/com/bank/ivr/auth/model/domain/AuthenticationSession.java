@@ -1,6 +1,7 @@
 package com.bank.ivr.auth.model.domain;
 
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -27,18 +28,23 @@ public class AuthenticationSession {
     @JsonProperty("startTime")
     private final LocalDateTime startTime;
     
+    @JsonProperty("trustLevelInfo")
+    private final TrustLevelInfo trustLevelInfo;
+    
     @JsonCreator
     public AuthenticationSession(
             @JsonProperty("attemptId") String attemptId,
             @JsonProperty("sessionId") String sessionId,
             @JsonProperty("customerIdentifier") CustomerIdentifier customerIdentifier,
             @JsonProperty("brand") String brand,
-            @JsonProperty("startTime") LocalDateTime startTime) {
+            @JsonProperty("startTime") LocalDateTime startTime,
+            @JsonProperty("trustLevelInfo") TrustLevelInfo trustLevelInfo) {
         this.attemptId = attemptId;
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
         this.brand = brand;
         this.startTime = startTime;
+        this.trustLevelInfo = trustLevelInfo;
     }
     
     // Getters
@@ -62,6 +68,10 @@ public class AuthenticationSession {
         return startTime;
     }
     
+    public TrustLevelInfo getTrustLevelInfo() {
+        return trustLevelInfo;
+    }
+    
     public static Builder builder() {
         return new Builder();
     }
@@ -72,6 +82,7 @@ public class AuthenticationSession {
         private CustomerIdentifier customerIdentifier;
         private String brand;
         private LocalDateTime startTime;
+        private TrustLevelInfo trustLevelInfo;
         
         public Builder attemptId(String attemptId) {
             this.attemptId = attemptId;
@@ -98,8 +109,13 @@ public class AuthenticationSession {
             return this;
         }
         
+        public Builder trustLevelInfo(TrustLevelInfo trustLevelInfo) {
+            this.trustLevelInfo = trustLevelInfo;
+            return this;
+        }
+        
         public AuthenticationSession build() {
-            return new AuthenticationSession(attemptId, sessionId, customerIdentifier, brand, startTime);
+            return new AuthenticationSession(attemptId, sessionId, customerIdentifier, brand, startTime, trustLevelInfo);
         }
     }
     

@@ -6,6 +6,7 @@ import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,6 +112,14 @@ class FailedTokenDemonstrationTest {
         lenient().when(failurePolicyService.getNextAlternativeToken(any(), any(), any())).thenReturn(null);
         lenient().when(failurePolicyService.isPartialAuthenticationAllowed(any(), any())).thenReturn(false);
     }
+    
+    private TrustLevelInfo createDefaultTrustLevelInfo() {
+        return new TrustLevelInfo(
+                TrustLevelInfo.TrustLevel.GREEN,
+                TrustLevelInfo.PhoneMatchStatus.SINGLE_MATCH,
+                1
+        );
+    }
 
     @Test
     @DisplayName("Complete Failed Token Flow Demonstration")
@@ -130,7 +139,8 @@ class FailedTokenDemonstrationTest {
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
                 List.of(new ProvidedToken("SSN", "wrong-ssn-1")),
-                "DEMO_BANK"
+                "DEMO_BANK",
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateToken(eq("SSN"), eq("DEMO_BANK"), 
@@ -159,7 +169,8 @@ class FailedTokenDemonstrationTest {
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
                 List.of(new ProvidedToken("SSN", "wrong-ssn-2")), // User provides SSN instead of PIN
-                "DEMO_BANK"
+                "DEMO_BANK",
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateToken(eq("SSN"), eq("DEMO_BANK"), 
@@ -193,7 +204,8 @@ class FailedTokenDemonstrationTest {
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
                 List.of(new ProvidedToken("DEBIT_CARD_PIN", "1234")),
-                "DEMO_BANK"
+                "DEMO_BANK",
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateToken(eq("DEBIT_CARD_PIN"), eq("DEMO_BANK"), 

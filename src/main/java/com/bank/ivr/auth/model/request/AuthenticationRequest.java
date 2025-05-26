@@ -25,18 +25,23 @@ public class AuthenticationRequest {
     @NotBlank(message = "Brand is required")
     private final String brand;
     
+    @Valid
+    private final TrustLevelInfo trustLevelInfo;
+    
     @JsonCreator
     public AuthenticationRequest(
             @JsonProperty("sessionId") String sessionId,
             @JsonProperty("customerIdentifier") CustomerIdentifier customerIdentifier,
             @JsonProperty("attemptId") String attemptId,
             @JsonProperty("providedTokens") List<ProvidedToken> providedTokens,
-            @JsonProperty("brand") String brand) {
+            @JsonProperty("brand") String brand,
+            @JsonProperty("trustLevelInfo") TrustLevelInfo trustLevelInfo) {
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
         this.attemptId = attemptId;
         this.providedTokens = providedTokens;
         this.brand = brand;
+        this.trustLevelInfo = trustLevelInfo;
     }
     
     public String getSessionId() {
@@ -59,6 +64,10 @@ public class AuthenticationRequest {
         return brand;
     }
     
+    public TrustLevelInfo getTrustLevelInfo() {
+        return trustLevelInfo;
+    }
+    
     public boolean isNewAttempt() {
         return attemptId == null || attemptId.trim().isEmpty();
     }
@@ -71,6 +80,7 @@ public class AuthenticationRequest {
                ", attemptId='" + attemptId + '\'' +
                ", providedTokens=" + providedTokens +
                ", brand='" + brand + '\'' +
+               ", trustLevelInfo=" + trustLevelInfo +
                '}';
     }
 } 

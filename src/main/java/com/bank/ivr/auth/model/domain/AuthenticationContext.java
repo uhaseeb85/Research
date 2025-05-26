@@ -1,6 +1,7 @@
 package com.bank.ivr.auth.model.domain;
 
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -53,6 +54,10 @@ public class AuthenticationContext {
     
     public LocalDateTime getStartTime() {
         return session.getStartTime();
+    }
+    
+    public TrustLevelInfo getTrustLevelInfo() {
+        return session.getTrustLevelInfo();
     }
     
     // Delegate getters to tokenState
@@ -285,6 +290,11 @@ public class AuthenticationContext {
         
         public Builder startTime(LocalDateTime startTime) {
             getSessionBuilder().startTime(startTime);
+            return this;
+        }
+        
+        public Builder trustLevelInfo(TrustLevelInfo trustLevelInfo) {
+            getSessionBuilder().trustLevelInfo(trustLevelInfo);
             return this;
         }
         
