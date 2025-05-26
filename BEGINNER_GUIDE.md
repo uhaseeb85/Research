@@ -1,14 +1,18 @@
 # 🏦 IVR Authentication System - Beginner's Guide
 
-## 🆕 Latest Updates (v1.2)
+## 🆕 Latest Updates (v1.3)
 
 This guide has been updated to reflect the most recent system improvements:
+- **🔥 NEW: Trust-Based Authentication**: Advanced conditional authentication based on trust levels and phone matching
+- **Royal Bank Implementation**: Complete example of trust-based authentication with hundreds of conditional scenarios
+- **Enhanced Request Model**: `AuthenticationRequest` now includes `TrustLevelInfo` for advanced authentication flows
+- **Conditional Rules**: New `ConditionalAuthenticationRule` interface for complex authentication logic
 - **Codebase Cleanup**: Removed deprecated methods and simplified APIs
 - **Enhanced Error Handling**: Streamlined controller logging and error responses
 - **Improved Code Quality**: Fixed compilation issues and updated test expectations
-- **Simplified Configuration**: Cleaner imports and reduced complexity
 
 📋 **For detailed information about all improvements, see [CODEBASE_CLEANUP_SUMMARY.md](CODEBASE_CLEANUP_SUMMARY.md)**
+📋 **For trust-based authentication details, see [ROYAL_BANK_TRUST_AUTHENTICATION.md](ROYAL_BANK_TRUST_AUTHENTICATION.md)**
 
 ## 📚 Table of Contents
 1. [What This System Does](#what-this-system-does)
@@ -17,10 +21,11 @@ This guide has been updated to reflect the most recent system improvements:
 4. [Understanding the Flow](#understanding-the-flow)
 5. [Code Examples](#code-examples)
 6. [Smart Token Re-asking Logic](#smart-token-re-asking-logic)
-7. [How to Add New Features](#how-to-add-new-features)
-8. [Testing Guide](#testing-guide)
-9. [Recent Improvements Deep Dive](#recent-improvements-deep-dive)
-10. [Troubleshooting](#troubleshooting)
+7. [Trust-Based Authentication (Advanced)](#trust-based-authentication-advanced)
+8. [How to Add New Features](#how-to-add-new-features)
+9. [Testing Guide](#testing-guide)
+10. [Recent Improvements Deep Dive](#recent-improvements-deep-dive)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -45,6 +50,7 @@ This is an **Interactive Voice Response (IVR) Authentication System** for banks.
 - ✅ **Security & retry management** (prevent brute force attacks)
 - ✅ **Flexible validation** (easy to add new authentication methods)
 - ✅ **Clean, simplified APIs** (deprecated methods removed)
+- ✅ **🆕 Trust-based authentication** (adaptive security based on trust levels)
 
 ---
 
@@ -621,6 +627,253 @@ public class AuthenticationOrchestrator {
 - **Security**: Failed tokens are tracked and avoided
 - **Efficiency**: Faster authentication by trying different tokens
 - **Flexibility**: System adapts to what the customer can provide
+
+---
+
+## 🔥 Trust-Based Authentication (Advanced)
+
+🆕 **New in v1.3**: The system now supports sophisticated trust-based authentication that adapts security requirements based on external trust assessments and phone number matching.
+
+### 🎯 What Is Trust-Based Authentication?
+
+Think of it like this: When you call your bank, the system already knows some things about you before you even start authenticating:
+
+- **Trust Level**: Is this a "trusted" call (GREEN) or "suspicious" call (RED)?
+- **Phone Matching**: Does your phone number match our records?
+- **Match Count**: How many customer accounts are associated with this phone?
+
+Based on these factors, the system can make smart decisions about what authentication to require.
+
+### 🧩 Key Components
+
+#### 1. **TrustLevelInfo** - The Context
+
+```java
+public class TrustLevelInfo {
+    public enum TrustLevel { 
+        RED,    // Low trust - suspicious activity, new device, etc.
+        GREEN   // High trust - known device, good history, etc.
+    }
+    
+    public enum PhoneMatchStatus {
+        NOT_MATCHED,        // Phone number not in our system
+        SINGLE_MATCH,       // Phone matches exactly one customer
+        MULTIPLE_MATCHES    // Phone matches multiple customers
+    }
+    
+    private final TrustLevel trustLevel;
+    private final PhoneMatchStatus phoneMatchStatus;
+    private final int matchedSsnCount;
+}
+```
+
+#### 2. **Enhanced Authentication Request**
+
+Every authentication request now includes trust information:
+
+```java
+// Old way (still works for backward compatibility)
+AuthenticationRequest request = new AuthenticationRequest(
+    sessionId, customerIdentifier, attemptId, tokens, brand
+);
+
+// New way (with trust information)
+TrustLevelInfo trustInfo = new TrustLevelInfo(
+    TrustLevel.GREEN,                    // High trust
+    PhoneMatchStatus.SINGLE_MATCH,      // Phone matches one customer
+    1                                    // One match found
+);
+
+AuthenticationRequest request = new AuthenticationRequest(
+    sessionId, customerIdentifier, attemptId, tokens, brand, trustInfo
+);
+```
+
+#### 3. **Conditional Authentication Rules**
+
+Create smart rules that adapt based on trust:
+
+```java
+@Component
+public class MyBankTrustRule implements ConditionalAuthenticationRule {
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
+        TrustLevelInfo trustInfo = context.getTrustLevelInfo();
+        
+        // 🟢 HIGH TRUST + PHONE MATCHED → Easy authentication
+        if (trustInfo.getTrustLevel() == TrustLevel.GREEN && 
+            trustInfo.getPhoneMatchStatus() == PhoneMatchStatus.SINGLE_MATCH) {
+            return "DEBIT_CARD_PIN";  // Just ask for PIN
+        }
+        
+        // 🔴 LOW TRUST + MULTIPLE MATCHES → Strong authentication
+        if (trustInfo.getTrustLevel() == TrustLevel.RED && 
+            trustInfo.getPhoneMatchStatus() == PhoneMatchStatus.MULTIPLE_MATCHES) {
+            return "SSN_FULL";  // Ask for full SSN
+        }
+        
+        // 🟡 MIXED SCENARIOS → Medium authentication
+        if (trustInfo.getPhoneMatchStatus() == PhoneMatchStatus.NOT_MATCHED) {
+            return "SSN_LAST_4";  // Ask for last 4 digits of SSN
+        }
+        
+        return null; // Use default logic
+    }
+    
+    @Override
+    public boolean shouldEscalateToken(String currentToken, AuthenticationContext context, CustomerProfile customerProfile) {
+        TrustLevelInfo trustInfo = context.getTrustLevelInfo();
+        
+        // If customer fails SSN_LAST_4 and trust is still good, try full SSN
+        if ("SSN_LAST_4".equals(currentToken) && 
+            trustInfo.getTrustLevel() == TrustLevel.GREEN &&
+            context.hasAskedTokenValidationFailure("SSN_LAST_4")) {
+            return true;  // Escalate to SSN_FULL
+        }
+        
+        return false;
+    }
+}
+```
+
+### 🏦 Real-World Example: Royal Bank
+
+The system includes a complete Royal Bank implementation that demonstrates hundreds of trust-based scenarios:
+
+#### Scenario 1: Trusted Customer
+```
+📞 Customer calls from known phone
+🟢 Trust Level: GREEN
+📱 Phone Status: SINGLE_MATCH
+🤖 "Please enter your 4-digit PIN"
+👤 Customer: "1234" ✅
+🤖 "Welcome! How can I help you today?"
+```
+
+#### Scenario 2: Suspicious Call
+```
+📞 Customer calls from unknown phone
+🔴 Trust Level: RED  
+📱 Phone Status: NOT_MATCHED
+🤖 "Please provide your full Social Security Number"
+👤 Customer: "123456789" ✅
+🤖 "Please also provide your PIN for additional verification"
+👤 Customer: "1234" ✅
+🤖 "Authentication successful"
+```
+
+#### Scenario 3: Shared Phone Number
+```
+📞 Customer calls from shared family phone
+🟡 Trust Level: GREEN
+📱 Phone Status: MULTIPLE_MATCHES (3 customers)
+🤖 "Please provide your full Social Security Number to identify your account"
+👤 Customer: "123456789" ✅
+🤖 "Thank you! Now please enter your PIN"
+👤 Customer: "1234" ✅
+🤖 "Welcome back!"
+```
+
+### 🔧 Implementation Steps
+
+#### 1. **Update Your Authentication Requests**
+
+```java
+// In your service layer
+public AuthenticationResponse authenticate(String sessionId, String phone, String brand) {
+    // Get trust information from external systems
+    TrustLevel trustLevel = trustAssessmentService.assessTrust(phone);
+    PhoneMatchStatus phoneStatus = phoneMatchingService.checkPhone(phone);
+    int matchCount = phoneMatchingService.getMatchCount(phone);
+    
+    TrustLevelInfo trustInfo = new TrustLevelInfo(trustLevel, phoneStatus, matchCount);
+    
+    // Create request with trust information
+    AuthenticationRequest request = new AuthenticationRequest(
+        sessionId,
+        new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, phone),
+        null, // New attempt
+        Collections.emptyList(), // No tokens yet
+        brand,
+        trustInfo
+    );
+    
+    return authenticationOrchestrator.authenticateCustomer(request);
+}
+```
+
+#### 2. **Create Trust-Based Token Definitions**
+
+```java
+// Different SSN tokens for different trust levels
+AuthTokenDefinition.builder()
+    .name("SSN_LAST_4")
+    .displayName("Last 4 digits of Social Security Number")
+    .description("Last 4 digits of SSN for lower risk authentication")
+    .priority(100)
+    .maxAttempts(2)
+    .validationPattern("\\d{4}")
+    .build(),
+
+AuthTokenDefinition.builder()
+    .name("SSN_FULL")
+    .displayName("Full Social Security Number")
+    .description("Complete SSN for higher risk authentication")
+    .priority(95)
+    .maxAttempts(1)
+    .validationPattern("\\d{9}")
+    .build()
+```
+
+#### 3. **Update Your Tests**
+
+```java
+@Test
+void testTrustBasedAuthentication() {
+    // Given: High trust scenario
+    TrustLevelInfo trustInfo = new TrustLevelInfo(
+        TrustLevelInfo.TrustLevel.GREEN,
+        TrustLevelInfo.PhoneMatchStatus.SINGLE_MATCH,
+        1
+    );
+    
+    AuthenticationRequest request = new AuthenticationRequest(
+        "session-123",
+        customerIdentifier,
+        null,
+        Collections.emptyList(),
+        "MY_BANK",
+        trustInfo
+    );
+    
+    // When
+    AuthenticationResponse response = orchestrator.authenticateCustomer(request);
+    
+    // Then: Should ask for easier authentication
+    assertEquals("DEBIT_CARD_PIN", response.getPrimaryTokenToAsk().getName());
+}
+```
+
+### 🎯 Benefits
+
+- **🛡️ Adaptive Security**: Higher security for suspicious calls, easier flow for trusted customers
+- **🚀 Better UX**: Fewer authentication steps for known good customers
+- **🎯 Risk Management**: Dynamic authentication based on real-time risk assessment
+- **📈 Scalability**: Supports hundreds of conditional scenarios without code changes
+
+### 💡 Use Cases
+
+1. **Fraud Prevention**: Red trust level automatically triggers multi-factor authentication
+2. **Customer Experience**: Green trust + known phone = streamlined authentication
+3. **Family Accounts**: Multiple phone matches handled gracefully
+4. **Progressive Security**: Failed authentication escalates to stronger methods
+
+### 📚 Learn More
+
+For complete implementation details and advanced scenarios, see:
+- [ROYAL_BANK_TRUST_AUTHENTICATION.md](ROYAL_BANK_TRUST_AUTHENTICATION.md) - Complete implementation guide
+- [BANK_ONBOARDING_GUIDE.md](BANK_ONBOARDING_GUIDE.md) - How to implement for your bank
 
 ---
 
