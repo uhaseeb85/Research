@@ -1,5 +1,15 @@
 # 🏦 IVR Authentication System - Beginner's Guide
 
+## 🆕 Latest Updates (v1.2)
+
+This guide has been updated to reflect the most recent system improvements:
+- **Codebase Cleanup**: Removed deprecated methods and simplified APIs
+- **Enhanced Error Handling**: Streamlined controller logging and error responses
+- **Improved Code Quality**: Fixed compilation issues and updated test expectations
+- **Simplified Configuration**: Cleaner imports and reduced complexity
+
+📋 **For detailed information about all improvements, see [CODEBASE_CLEANUP_SUMMARY.md](CODEBASE_CLEANUP_SUMMARY.md)**
+
 ## 📚 Table of Contents
 1. [What This System Does](#what-this-system-does)
 2. [High-Level Architecture](#high-level-architecture)
@@ -9,7 +19,8 @@
 6. [Smart Token Re-asking Logic](#smart-token-re-asking-logic)
 7. [How to Add New Features](#how-to-add-new-features)
 8. [Testing Guide](#testing-guide)
-9. [Troubleshooting](#troubleshooting)
+9. [Recent Improvements Deep Dive](#recent-improvements-deep-dive)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -33,6 +44,7 @@ This is an **Interactive Voice Response (IVR) Authentication System** for banks.
 - ✅ **Brand-specific rules** (different banks have different requirements)
 - ✅ **Security & retry management** (prevent brute force attacks)
 - ✅ **Flexible validation** (easy to add new authentication methods)
+- ✅ **Clean, simplified APIs** (deprecated methods removed)
 
 ---
 
@@ -54,13 +66,16 @@ com.bank.ivr.auth/
 ├── 📁 validator/       # Token validation rules (how we check credentials)
 │   └── impl/           # Specific validator implementations
 ├── 📁 config/          # Configuration (rules for different banks)
-└── 📁 util/           # Helper utilities
+├── 📁 controller/      # REST API endpoints
+├── 📁 util/           # Helper utilities (simplified encryption)
+└── 📁 repository/     # Data access layer
 ```
 
 ### Architecture Pattern: **Strategy + Service Layer**
 - **Strategy Pattern**: Different validators for different token types
 - **Service Layer**: Business logic separated from data
 - **Dependency Injection**: Spring automatically wires components
+- **Brand-Aware Design**: Each bank can have custom rules
 
 ---
 
@@ -187,341 +202,303 @@ public class CustomerProfile {
     private String motherMaidenName; // "SMITH"
     private String accountNumber; // "ACC123456"
     // ... other fields
+    
+    // 🆕 Simplified access methods
+    public String getHashedPin() { return hashedPin; }
+    public String getSsn() { return ssn; }
+    // ... other getters
 }
 ```
 
-**Security Note**: Sensitive data like PINs are stored as secure hashes, never plain text!
+**Key Points**:
+- **Immutable Data**: Once loaded, customer data doesn't change during authentication
+- **Hashed Passwords**: All sensitive data is stored hashed (using `EncryptionUtil.hash()`)
+- **Flexible Fields**: Easy to add new authentication fields for different banks
 
-### 4. 🧠 **AuthenticationContext** - The Session State
+### 4. 🔐 **EncryptionUtil** - Simplified Security
 
-**What it is**: Tracks the current authentication session's progress.
+**What it is**: A utility class for secure hashing and verification (recently simplified).
 
 ```java
-public class AuthenticationContext {
-    private String attemptId;                    // "attempt-abc123"
-    private List<String> authenticatedTokens;    // ["SSN", "PIN"] 
-    private List<String> eligibleTokens;         // ["SSN", "PIN", "DOB"]
-    private Map<String, Integer> tokenAttemptsRemaining; // {"SSN": 2, "PIN": 3}
-    private int overallAttemptsRemaining;        // 5
-    // ... other tracking fields
+public class EncryptionUtil {
+    // 🆕 Simplified API - only these methods exist now
+    public static String hash(String plainText) {
+        // Uses BCrypt for secure hashing
+        return BCrypt.hashpw(plainText, BCrypt.gensalt());
+    }
+    
+    public static boolean verify(String plainText, String hashedText) {
+        // Verifies plain text against hash
+        return BCrypt.checkpw(plainText, hashedText);
+    }
 }
 ```
 
-**Think of it like a game state**:
-- Which levels (tokens) has the player completed?
-- Which levels are available?
-- How many lives (attempts) are left?
+**🚨 Important Changes**:
+- **Removed**: `hashPin()` and `verifyPin()` methods (were just wrappers)
+- **Use**: `hash()` for all hashing needs
+- **Use**: `verify()` for all verification needs
+- **Migration**: All existing code has been updated to use the new methods
 
-### 5. 🏢 **Brand Configuration** - Multi-Tenant Support
+### 5. 🎮 **AuthenticationController** - The API Gateway
 
-**What it is**: Different banks (brands) have different authentication rules.
+**What it is**: REST controller that handles authentication requests (recently simplified).
 
 ```java
-// Premium Bank: Requires SSN + PIN, allows 5 attempts
-// Community Bank: Requires SSN + DOB, allows 3 attempts  
-// Business Bank: Requires SSN + PIN + Employee ID, allows 10 attempts
+@RestController
+@RequestMapping("/api/v1/auth")
+public class AuthenticationController {
+    
+    @PostMapping("/customer")
+    public ResponseEntity<AuthenticationResponse> authenticateCustomer(@RequestBody AuthenticationRequest request) {
+        // 🆕 Simplified logging - only essential information
+        logger.info("Authentication request started - SessionId: {}, Brand: {}, Customer: {}", 
+                   sessionId, brand, request.getCustomerIdentifier());
+        
+        // Validate brand support
+        if (!brandConfigService.isBrandSupported(brand)) {
+            logger.warn("Unsupported brand: {}", brand);
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+        
+        // Delegate to orchestrator
+        AuthenticationResponse response = authenticationOrchestrator.authenticateCustomer(request);
+        
+        logger.info("Authentication completed - SessionId: {}, Status: {}", sessionId, response.getStatus());
+        return ResponseEntity.ok(response);
+    }
+}
+```
 
+**🆕 Recent Improvements**:
+- **Simplified Logging**: Removed excessive timing and debug logs
+- **Cleaner Error Handling**: Streamlined error responses
+- **Better Readability**: Focus on essential information only
+
+### 6. 🏢 **BrandAuthConfiguration** - Bank-Specific Rules
+
+**What it is**: Interface that defines how each bank wants authentication to work.
+
+```java
 public interface BrandAuthConfiguration {
-    String getBrandCode();              // "PREMIUM_BANK"
-    List<String> getRequiredTokens();   // ["SSN", "PIN"]
-    int getMaxOverallAttempts();        // 5
-    Map<String, String> getBrandMessages(); // Custom prompts
+    String getBrandCode();                    // "PREMIUM_BANK"
+    List<AuthTokenDefinition> getTokenDefinitions(); // What tokens are available
+    List<String> getRequiredTokens();        // Which tokens are mandatory
+    int getMaxOverallAttempts();             // How many tries total
+    boolean isConcurrentTokenAuthAllowed();  // Can user provide multiple tokens at once
+    Map<String, String> getBrandMessages();  // Custom messages for this bank
 }
 ```
 
----
-
-## 🏢 Brand-Aware Validation System
-
-### 🎯 The Core Rule: "One Validator Per Token Per Brand"
-
-The system enforces a critical constraint: **there can only be one validator for each token type within each brand**.
-
-### ✅ What's Allowed
-
+**Example Implementation**:
 ```java
-// ✅ GOOD: Same token, different brands
 @Component
-public class DefaultSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "DEFAULT"; }
-}
-
-@Component  
-public class PremiumBankSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }  // Different brand = OK
+public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
+    @Override
+    public String getBrandCode() {
+        return "PREMIUM_BANK";
+    }
+    
+    @Override
+    public List<String> getRequiredTokens() {
+        // Premium Bank requires both PIN and date of birth
+        return Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
+    }
+    
+    @Override
+    public int getMaxOverallAttempts() {
+        return 3; // Strict security
+    }
+    
+    @Override
+    public Map<String, String> getBrandMessages() {
+        Map<String, String> messages = new HashMap<>();
+        messages.put("welcome", "Welcome to Premium Banking Services!");
+        messages.put("success", "Authentication successful. How may we assist you today?");
+        return messages;
+    }
 }
 ```
-
-### ❌ What's Forbidden
-
-```java
-// ❌ BAD: Same token, same brand
-@Component
-public class FirstPremiumSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }
-}
-
-@Component
-public class SecondPremiumSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }  // ❌ DUPLICATE!
-}
-// This will cause IllegalStateException at startup
-```
-
-### 🔍 How It Works
-
-1. **Startup Validation**: System scans all validators and builds composite keys
-2. **Composite Keys**: Each validator gets a unique `brand:token` key (e.g., "PREMIUM_BANK:SSN")
-3. **Conflict Detection**: If duplicate keys found, system fails with clear error message
-4. **Runtime Routing**: Requests use brand+token to find the exact validator needed
-
-### 📋 Validation Examples
-
-```java
-// System creates these mappings:
-"DEFAULT:SSN" → DefaultSsnValidator
-"PREMIUM_BANK:SSN" → PremiumBankSsnValidator  
-"DEFAULT:PIN" → DefaultPinValidator
-"COMMUNITY_BANK:PIN" → CommunityBankPinValidator
-
-// At runtime:
-// Premium Bank customer providing SSN → uses PremiumBankSsnValidator
-// Community Bank customer providing SSN → uses DefaultSsnValidator (fallback)
-// Any customer providing PIN → uses appropriate validator for their brand
-```
-
-### 🛡️ Benefits
-
-- **🔒 Prevents Conflicts**: No ambiguity about which validator to use
-- **🏢 Brand Isolation**: Each brand can have completely different validation rules
-- **🔧 Easy Maintenance**: Clear separation of concerns
-- **⚡ Fast Lookup**: O(1) performance with clear keys
-- **🐛 Early Error Detection**: Problems caught at startup, not runtime
 
 ---
 
 ## 🔄 Understanding the Flow
 
-### Detailed Authentication Flow
+### Complete Authentication Flow
 
-```
-1. 📞 Customer Calls
-   ↓
-2. 🎯 AuthenticationRequest Created
-   {
-     "customerIdentifier": {"type": "PHONE", "value": "555-1234"},
-     "brand": "PREMIUM_BANK",
-     "providedTokens": [
-       {"tokenName": "SSN", "tokenValue": "123456789"}
-     ]
-   }
-   ↓
-3. 🔍 Context Creation (AuthenticationContextService)
-   - Look up customer profile by phone number
-   - Determine eligible tokens based on available data
-   - Set up attempt limits based on brand rules
-   ↓
-4. 🎯 Token Processing (TokenProcessingService)
-   - For each provided token:
-     - Find appropriate validator
-     - Validate token value
-     - Update authentication state
-   ↓
-5. 📋 Response Generation (AuthenticationResponseService)
-   - Check if authentication is complete
-   - Determine next token to ask for
-   - Build user-friendly response
-   ↓
-6. 📞 Response to Customer
-   {
-     "status": "PENDING_MORE_TOKENS",
-     "message": "Thank you. Now please provide your 4-digit PIN.",
-     "primaryTokenToAsk": {"name": "DEBIT_CARD_PIN", "description": "4-digit PIN"},
-     "remainingAttempts": {"SSN": 3, "DEBIT_CARD_PIN": 3, "OVERALL": 4}
-   }
+```mermaid
+graph TD
+    A[Customer Calls] --> B[Controller Receives Request]
+    B --> C{Brand Supported?}
+    C -->|No| D[Return Error]
+    C -->|Yes| E[Orchestrator Processes]
+    E --> F[Find Customer Profile]
+    F --> G{Customer Found?}
+    G -->|No| H[Return Customer Not Found]
+    G -->|Yes| I[Determine Required Tokens]
+    I --> J[Validate Provided Tokens]
+    J --> K{All Required Tokens Valid?}
+    K -->|No| L[Ask for More Tokens]
+    K -->|Yes| M[Authentication Success]
+    L --> N[Smart Re-asking Logic]
+    N --> O[Return Next Token Request]
+    M --> P[Return Success Response]
 ```
 
-### Simple Example Walkthrough
+### Step-by-Step Breakdown
 
-**Scenario**: Customer with phone `555-1234` wants to authenticate with Premium Bank.
+1. **Request Arrives**: Customer data comes to `AuthenticationController`
+2. **Brand Validation**: System checks if the bank is supported
+3. **Customer Lookup**: Find customer profile using identifier (phone, account, etc.)
+4. **Token Processing**: For each provided token:
+   - Find appropriate validator (brand + token type)
+   - Normalize input (remove formatting)
+   - Validate against stored data
+5. **Decision Making**: 
+   - If all required tokens valid → Success
+   - If missing tokens → Ask for more
+   - If failed tokens → Smart re-asking (won't ask for failed tokens again)
+6. **Response**: Return appropriate response with next steps
 
-```java
-// Step 1: Customer provides SSN
-AuthenticationRequest request = new AuthenticationRequest(
-    "attempt-123",
-    CustomerIdentifier.phone("555-1234"),
-    "PREMIUM_BANK",
-    List.of(new ProvidedToken("SSN", "123456789"))
-);
+### Example Request/Response
 
-// Step 2: System processes
-AuthenticationService service = // ... injected
-AuthenticationResponse response = service.authenticate(request);
-
-// Step 3: Response
+**Initial Request** (no tokens provided):
+```json
 {
-  "status": "PENDING_MORE_TOKENS",
-  "message": "Thank you. Now please provide your 4-digit PIN.",
-  "authenticatedTokens": ["SSN"],
-  "remainingAttempts": {"PIN": 3, "OVERALL": 4}
+  "sessionId": "session-123",
+  "customerIdentifier": {
+    "type": "PHONE_NUMBER",
+    "value": "+1234567890"
+  },
+  "providedTokens": [],
+  "brand": "PREMIUM_BANK"
 }
+```
 
-// Step 4: Customer provides PIN
-AuthenticationRequest request2 = new AuthenticationRequest(
-    "attempt-123",  // Same attempt ID
-    CustomerIdentifier.phone("555-1234"),
-    "PREMIUM_BANK", 
-    List.of(new ProvidedToken("DEBIT_CARD_PIN", "1234"))
-);
-
-// Step 5: Final response
+**Response** (asking for first token):
+```json
 {
-  "status": "AUTHENTICATED",
-  "message": "Authentication successful. Welcome!",
-  "authenticatedTokens": ["SSN", "DEBIT_CARD_PIN"]
+  "attemptId": "attempt-456",
+  "status": "PENDING_PRIMARY_TOKEN",
+  "message": "Please provide your 4-digit PIN.",
+  "requiredTokensRemaining": ["DEBIT_CARD_PIN", "DATE_OF_BIRTH"],
+  "authenticatedTokens": []
+}
+```
+
+**Follow-up Request** (PIN provided):
+```json
+{
+  "sessionId": "session-123",
+  "attemptId": "attempt-456",
+  "customerIdentifier": {
+    "type": "PHONE_NUMBER", 
+    "value": "+1234567890"
+  },
+  "providedTokens": [
+    {"tokenName": "DEBIT_CARD_PIN", "tokenValue": "1234"}
+  ],
+  "brand": "PREMIUM_BANK"
+}
+```
+
+**Response** (asking for second token):
+```json
+{
+  "attemptId": "attempt-456",
+  "status": "PENDING_MORE_TOKENS",
+  "message": "Please provide your date of birth in MM/DD/YYYY format.",
+  "requiredTokensRemaining": ["DATE_OF_BIRTH"],
+  "authenticatedTokens": ["DEBIT_CARD_PIN"]
 }
 ```
 
 ---
 
-## 💡 Code Examples
+## 💻 Code Examples
 
-### Adding a New Token Validator
+### Creating a New Token Validator
 
-**Scenario**: Add Date of Birth validation
+Let's create a validator for mother's maiden name:
 
 ```java
-@Component  // Spring will automatically discover this
-public class DateOfBirthValidator implements TokenValidator {
+@Component
+public class MotherMaidenNameValidator implements TokenValidator {
     
-    private static final Logger logger = LoggerFactory.getLogger(DateOfBirthValidator.class);
+    private static final Logger logger = LoggerFactory.getLogger(MotherMaidenNameValidator.class);
     
     @Override
     public String getTokenName() {
-        return "DATE_OF_BIRTH";
+        return "MOTHER_MAIDEN_NAME";
     }
     
     @Override
     public String getBrand() {
-        return "DEFAULT";  // Works for all brands unless brand-specific exists
+        return "DEFAULT"; // Works for all brands
     }
     
     @Override
-    public boolean validate(String customerIdentifierValue, 
-                           String providedTokenValue, 
-                           CustomerProfile customerProfile) {
-        
-        if (customerProfile.getDateOfBirth() == null || providedTokenValue == null) {
-            logger.debug("DOB validation failed: null values");
+    public boolean validate(String customerIdentifierValue, String providedTokenValue, CustomerProfile customerProfile) {
+        if (customerProfile.getMotherMaidenName() == null || providedTokenValue == null) {
+            logger.debug("Mother maiden name validation failed: null values");
             return false;
         }
         
-        // Normalize the input (remove special characters)
         String normalizedProvided = normalizeTokenValue(providedTokenValue);
+        String normalizedStored = normalizeTokenValue(customerProfile.getMotherMaidenName());
         
-        // Parse the provided date
-        LocalDate providedDate = parseDate(normalizedProvided);
-        if (providedDate == null) {
-            logger.debug("DOB validation failed: invalid date format");
-            return false;
-        }
+        boolean isValid = normalizedProvided.equals(normalizedStored);
         
-        // Compare with stored date
-        boolean isValid = providedDate.equals(customerProfile.getDateOfBirth());
+        logger.debug("Mother maiden name validation {} for customer {}", 
+                    isValid ? "successful" : "failed", customerIdentifierValue);
         
-        logger.debug("DOB validation result: {} for customer {}", 
-                    isValid, customerIdentifierValue);
         return isValid;
     }
     
     @Override
     public String normalizeTokenValue(String providedTokenValue) {
-        if (providedTokenValue == null) return null;
-        
-        // Remove all non-digits: "01/15/1990" → "01151990"
-        return providedTokenValue.replaceAll("[^0-9]", "");
+        if (providedTokenValue == null) {
+            return null;
+        }
+        // Convert to uppercase, remove extra spaces
+        return providedTokenValue.trim().toUpperCase().replaceAll("\\s+", " ");
     }
     
     @Override
     public int getPriority() {
-        return 70; // Medium priority (SSN=100, PIN=90, DOB=70)
-    }
-    
-    /**
-     * Parse date from various formats:
-     * - "01151990" → January 15, 1990
-     * - "01-15-1990" → January 15, 1990
-     * - "01/15/1990" → January 15, 1990
-     */
-    private LocalDate parseDate(String dateStr) {
-        if (dateStr.length() != 8) return null;
-        
-        try {
-            int month = Integer.parseInt(dateStr.substring(0, 2));
-            int day = Integer.parseInt(dateStr.substring(2, 4));
-            int year = Integer.parseInt(dateStr.substring(4, 8));
-            
-            return LocalDate.of(year, month, day);
-        } catch (Exception e) {
-            logger.debug("Failed to parse date: {}", dateStr);
-            return null;
-        }
+        return 80; // Medium priority
     }
 }
 ```
 
-**That's it!** Spring will automatically:
-1. Find your new validator
-2. Add it to the validation map with key "DEFAULT:DATE_OF_BIRTH"
-3. Route "DATE_OF_BIRTH" tokens to your validator
-
-### Creating Brand-Specific Validators
-
-**Example**: Community Bank needs 6-digit PINs instead of 4-digit
+### Using the Simplified Encryption Utility
 
 ```java
-@Component
-public class CommunityBankPinValidator implements TokenValidator {
+// 🆕 Current way (simplified)
+public class ExampleUsage {
     
-    @Override
-    public String getTokenName() {
-        return "DEBIT_CARD_PIN";  // Same token type as default
-    }
-    
-    @Override
-    public String getBrand() {
-        return "COMMUNITY_BANK";  // Brand-specific
-    }
-    
-    @Override
-    public boolean validate(String customerId, String pin, CustomerProfile profile) {
-        String normalizedPin = normalizeTokenValue(pin);
+    public void hashPassword() {
+        String plainPassword = "mySecretPin";
         
-        // Community Bank requirement: 6 digits instead of 4
-        if (normalizedPin.length() != 6) {
-            logger.debug("Community Bank PIN must be 6 digits, got: {}", normalizedPin.length());
-            return false;
-        }
+        // Hash the password
+        String hashedPassword = EncryptionUtil.hash(plainPassword);
         
-        return EncryptionUtil.verifyPin(normalizedPin, profile.getHashedPin());
+        // Store hashedPassword in database
+        customerProfile.setHashedPin(hashedPassword);
     }
     
-    @Override
-    public String normalizeTokenValue(String pin) {
-        return pin != null ? pin.replaceAll("[^0-9]", "") : null;
+    public boolean verifyPassword(String providedPassword, CustomerProfile profile) {
+        // Verify the password
+        return EncryptionUtil.verify(providedPassword, profile.getHashedPin());
     }
 }
+
+// ❌ Old way (removed - will cause compilation errors)
+// String hash = EncryptionUtil.hashPin(pin);           // Method removed
+// boolean valid = EncryptionUtil.verifyPin(pin, hash); // Method removed
 ```
 
-**Result**: System now has two PIN validators:
-- `DEFAULT:DEBIT_CARD_PIN` → 4-digit validation (for most brands)
-- `COMMUNITY_BANK:DEBIT_CARD_PIN` → 6-digit validation (Community Bank only)
-
-### Adding a New Brand Configuration
+### Creating a Brand-Specific Configuration
 
 ```java
 @Component
@@ -534,39 +511,50 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public List<AuthTokenDefinition> getTokenDefinitions() {
-        return List.of(
+        return Arrays.asList(
             AuthTokenDefinition.builder()
-                .name("SSN")
-                .description("Social Security Number")
-                .priority(100)
-                .maxAttempts(3)
-                .build(),
+                    .name("SSN")
+                    .description("Social Security Number")
+                    .priority(100)
+                    .maskingRegex("\\d{4}")  // Only show last 4 digits
+                    .inputFormatRegex("^\\d{4,9}$")  // 4-9 digits allowed
+                    .maxAttempts(3)
+                    .build(),
+            
             AuthTokenDefinition.builder()
-                .name("DATE_OF_BIRTH")
-                .description("Date of Birth (MM/DD/YYYY)")
-                .priority(80)
-                .maxAttempts(3)
-                .build()
+                    .name("DATE_OF_BIRTH")
+                    .description("Date of Birth")
+                    .priority(90)
+                    .maskingRegex("\\d{2}/\\d{2}/\\d{4}")
+                    .inputFormatRegex("^\\d{1,2}/\\d{1,2}/\\d{4}$")
+                    .maxAttempts(3)
+                    .build()
         );
     }
     
     @Override
     public List<String> getRequiredTokens() {
-        return List.of("SSN", "DATE_OF_BIRTH"); // Different from Premium Bank
+        // Community Bank only requires SSN (simpler for customers)
+        return Arrays.asList("SSN");
     }
     
     @Override
     public int getMaxOverallAttempts() {
-        return 7; // More lenient than Premium Bank
+        return 5; // More lenient than premium bank
+    }
+    
+    @Override
+    public boolean isConcurrentTokenAuthAllowed() {
+        return false; // One token at a time for simplicity
     }
     
     @Override
     public Map<String, String> getBrandMessages() {
-        return Map.of(
-            "primary_prompt", "Welcome to Community Bank! Please provide your {token_description}.",
-            "success", "Thank you for banking with Community Bank!",
-            "failure", "We're sorry, but we couldn't verify your identity. Please visit a branch."
-        );
+        Map<String, String> messages = new HashMap<>();
+        messages.put("welcome", "Hello! Welcome to Community Bank.");
+        messages.put("success", "Great! You're all set. How can we help you today?");
+        messages.put("failure", "We couldn't verify your identity. Please try again or visit your local branch.");
+        return messages;
     }
 }
 ```
@@ -575,735 +563,452 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
 
 ## 🧠 Smart Token Re-asking Logic
 
-### 🎯 What It Does
+One of the coolest features of this system is that it **never asks for the same token twice** if it failed validation.
 
-The system includes intelligent logic that prevents unnecessary re-prompting of tokens and improves user experience. It tracks which tokens have been asked and whether users provided them, making smart decisions about when to re-ask tokens.
-
-### 🔍 Key Concepts
-
-#### 1. **Asked Token Tracking**
-The system tracks every token that has been asked during an authentication session:
+### How It Works
 
 ```java
-// In AuthenticationContext
-private List<String> askedTokens = new ArrayList<>();
-private Map<String, Integer> askedTokensWithValidationFailure = new HashMap<>();
-
-// Example state during authentication:
-askedTokens: ["SSN", "DEBIT_CARD_PIN"]
-askedTokensWithValidationFailure: {"SSN": 1} // SSN failed once
-```
-
-#### 2. **Smart Re-asking Rules**
-
-The system follows these intelligent rules:
-
-- **✅ Can Re-ask**: Token was asked but user didn't provide it (no validation attempt)
-- **❌ Cannot Re-ask**: Token was asked, user provided it, but validation failed  
-- **❌ Cannot Re-ask**: Token has completely failed (exhausted all attempts)
-
-### 📋 Real-World Examples
-
-#### Example 1: User Doesn't Provide Asked Token ✅
-
-```
-🤖 System: "Please provide your PIN"
-   → PIN added to askedTokens: ["PIN"]
-   
-👤 User: Provides SSN instead: "123456789"
-   → System validates SSN successfully
-   → PIN can still be re-asked (user never attempted PIN)
-   
-🤖 System: "Thank you. Now please also provide your PIN for additional security"
-   → Re-asking is allowed because user never attempted PIN
-```
-
-#### Example 2: User Provides Wrong Token ❌
-
-```
-🤖 System: "Please provide your PIN"
-   → PIN added to askedTokens: ["PIN"]
-   
-👤 User: Provides wrong PIN: "9999"
-   → System validates PIN, fails
-   → PIN marked with validation failure
-   → Cannot re-ask PIN (user provided it but failed)
-   
-🤖 System: "Let's try a different method. Please provide your date of birth"
-   → Moves to next available token
-```
-
-#### Example 3: Token Completely Failed ❌
-
-```
-👤 User: Provides wrong PIN 3 times
-   → PIN exhausts all attempts
-   → PIN added to failedTokens: ["PIN"]
-   → PIN cannot be re-asked or selected
-   
-🤖 System: Excludes PIN from all future selections
-   → Primary token selection skips PIN
-   → Secondary token lists exclude PIN
-```
-
-### 🔧 How It Works in Code
-
-#### AuthenticationContext Methods
-
-```java
-public class AuthenticationContext {
-    // Track which tokens have been asked
-    public void addAskedToken(String tokenName) {
-        if (!askedTokens.contains(tokenName)) {
-            askedTokens.add(tokenName);
-        }
-    }
+// In AuthenticationOrchestrator
+public class AuthenticationOrchestrator {
     
-    // Mark when user provided token but validation failed
-    public void markAskedTokenValidationFailure(String tokenName) {
-        askedTokensWithValidationFailure.merge(tokenName, 1, Integer::sum);
-    }
-    
-    // Check if token can be re-asked
-    public boolean canReAskToken(String tokenName) {
-        // Cannot re-ask if token completely failed
-        if (isTokenFailed(tokenName)) {
-            return false;
+    public AuthenticationResponse authenticateCustomer(AuthenticationRequest request) {
+        // Track which tokens have been tried and failed
+        Set<String> failedTokens = context.getFailedTokens();
+        Set<String> validatedTokens = context.getValidatedTokens();
+        
+        // Process provided tokens
+        for (ProvidedToken token : request.getProvidedTokens()) {
+            if (validateToken(token)) {
+                validatedTokens.add(token.getTokenName());
+            } else {
+                failedTokens.add(token.getTokenName()); // Mark as failed
+            }
         }
         
-        // Cannot re-ask if user provided it but validation failed
-        if (hasAskedTokenValidationFailure(tokenName)) {
-            return false;
-        }
+        // Determine what to ask for next
+        List<String> remainingRequired = getRemainingRequiredTokens(validatedTokens);
         
-        // Can re-ask if token was asked but user didn't provide it
-        return true;
+        // 🧠 Smart part: Remove failed tokens from consideration
+        remainingRequired.removeAll(failedTokens);
+        
+        if (remainingRequired.isEmpty()) {
+            return AuthenticationResponse.success();
+        } else {
+            // Ask for next highest priority token that hasn't failed
+            String nextToken = getHighestPriorityToken(remainingRequired);
+            return AuthenticationResponse.askForToken(nextToken);
+        }
     }
 }
 ```
 
-#### Token Selection Logic
+### Example Scenario
 
-```java
-public class AuthenticationResponseService {
-    
-    private AuthTokenDefinition selectNextToken(AuthenticationContext context, List<AuthTokenDefinition> availableTokens) {
-        return availableTokens.stream()
-            .filter(token -> !context.isTokenAuthenticated(token.getName()))  // Skip authenticated
-            .filter(token -> !context.isTokenFailed(token.getName()))         // Skip failed
-            .filter(token -> context.canReAskToken(token.getName()))           // Smart re-asking logic
-            .max(Comparator.comparing(AuthTokenDefinition::getPriority))      // Highest priority
-            .orElse(null);
-    }
-}
+```
+👤 Customer: "I want to authenticate"
+🤖 System: "Please provide your PIN"
+👤 Customer: "9999" (wrong PIN)
+🤖 System: "Please provide your SSN" (won't ask for PIN again!)
+👤 Customer: "123456789" (correct SSN)
+🤖 System: "Please provide your date of birth" (still won't ask for PIN)
+👤 Customer: "01/01/1990" (correct DOB)
+🤖 System: "Authentication successful!" (PIN never asked again)
 ```
 
-### 🧪 Testing Smart Re-asking Logic
+### Benefits
 
-When building your own validators and brand configurations, test these scenarios:
-
-```java
-@Test
-@DisplayName("Should allow re-asking token that was asked but user didn't provide")
-void shouldAllowReAskingUnprovidedToken() {
-    // Given - token was asked but user didn't provide it
-    context.addAskedToken("MOBILE_PIN");
-    // No validation failure marked
-    
-    // When
-    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
-    
-    // Then
-    assertEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
-    assertTrue(context.canReAskToken("MOBILE_PIN"));
-}
-
-@Test
-@DisplayName("Should not re-ask token that user provided but failed validation")
-void shouldNotReAskFailedToken() {
-    // Given - token was asked and user provided it but validation failed
-    context.addAskedToken("MOBILE_PIN");
-    context.markAskedTokenValidationFailure("MOBILE_PIN");
-    
-    // When
-    AuthenticationResponse response = authService.buildResponse(context, profile, "TECH_BANK");
-    
-    // Then
-    assertNotEquals("MOBILE_PIN", response.getPrimaryTokenToAsk().getName());
-    assertFalse(context.canReAskToken("MOBILE_PIN"));
-}
-```
-
-### 💡 Benefits for User Experience
-
-1. **🚫 No Repeated Failures**: Users aren't asked again for tokens they already failed
-2. **🔄 Smart Recovery**: System adapts when users provide unexpected tokens
-3. **⚡ Faster Authentication**: Reduces unnecessary back-and-forth
-4. **🎯 Better Flow**: Natural conversation flow based on user behavior
-
-### 🏗️ Implementation in Your Brand
-
-When creating your brand configuration, consider how re-asking logic affects your token strategy:
-
-```java
-@Component
-public class TechBankAuthConfiguration implements BrandAuthConfiguration {
-    
-    @Override
-    public List<AuthTokenDefinition> getTokenDefinitions() {
-        return Arrays.asList(
-            // Primary token - will be asked first
-            AuthTokenDefinition.builder()
-                    .name("MOBILE_PIN")
-                    .description("Mobile Banking PIN")
-                    .priority(150) // Highest priority
-                    .maxAttempts(3)
-                    .build(),
-            
-            // Secondary token - asked if primary fails
-            AuthTokenDefinition.builder()
-                    .name("BIOMETRIC_ID")
-                    .description("Biometric Authentication")
-                    .priority(140)
-                    .maxAttempts(2)
-                    .build(),
-                    
-            // Backup token - last resort
-            AuthTokenDefinition.builder()
-                    .name("SECURITY_QUESTION")
-                    .description("Security Question Answer")
-                    .priority(130)
-                    .maxAttempts(2)
-                    .build()
-        );
-    }
-}
-```
-
-**Strategy**: Plan your token priorities knowing that if high-priority tokens fail validation, the system will intelligently move to lower-priority alternatives without re-asking failed tokens.
+- **Better User Experience**: No frustrating repeated requests
+- **Security**: Failed tokens are tracked and avoided
+- **Efficiency**: Faster authentication by trying different tokens
+- **Flexibility**: System adapts to what the customer can provide
 
 ---
 
-## 🛠️ How to Add New Features
+## 🔧 How to Add New Features
 
-### 1. Adding a New Token Type
+### Adding a New Token Type
 
-**Steps**:
-1. ✅ Add field to `CustomerProfile` if needed
-2. ✅ Create new `TokenValidator` implementation
-3. ✅ Add token to brand configurations
-4. ✅ Write tests
-
-**Example**: Adding Voice Print validation
-
+1. **Create the Validator**:
 ```java
-// Step 1: Add to CustomerProfile
+@Component
+public class VoiceprintValidator implements TokenValidator {
+    @Override
+    public String getTokenName() { return "VOICEPRINT"; }
+    
+    @Override
+    public String getBrand() { return "DEFAULT"; }
+    
+    @Override
+    public boolean validate(String customerId, String voiceData, CustomerProfile profile) {
+        // Call external voice recognition service
+        return voiceRecognitionService.verify(voiceData, profile.getVoiceprintId());
+    }
+    
+    // ... other methods
+}
+```
+
+2. **Update CustomerProfile** (if needed):
+```java
 public class CustomerProfile {
-    private String voicePrintHash; // New field
-    // ... getters/setters
-}
-
-// Step 2: Create validator
-@Component
-public class VoicePrintValidator implements TokenValidator {
-    @Override
-    public String getTokenName() { return "VOICE_PRINT"; }
+    private String voiceprintId; // Add new field
     
-    @Override
-    public boolean validate(String customerId, String audioData, CustomerProfile profile) {
-        // Use ML service to compare voice patterns
-        return voiceMLService.compareVoicePrint(audioData, profile.getVoicePrintHash());
-    }
-}
-
-// Step 3: Add to brand config
-AuthTokenDefinition.builder()
-    .name("VOICE_PRINT")
-    .description("Voice Authentication")
-    .priority(95)
-    .build()
-```
-
-### 2. Adding Complex Validation Logic
-
-**Example**: ZIP Code + Last Transaction Amount validation
-
-```java
-@Component
-public class ZipTransactionValidator implements TokenValidator {
-    
-    @Autowired
-    private TransactionService transactionService;
-    
-    @Override
-    public String getTokenName() {
-        return "ZIP_PLUS_LAST_TRANSACTION";
-    }
-    
-    @Override
-    public String getBrand() {
-        return "DEFAULT";  // Available for all brands
-    }
-    
-    @Override
-    public boolean validate(String customerId, String providedValue, CustomerProfile profile) {
-        // Expected format: "ZIP:AMOUNT" e.g., "12345:25.99"
-        String[] parts = providedValue.split(":");
-        if (parts.length != 2) return false;
-        
-        String providedZip = parts[0];
-        String providedAmount = parts[1];
-        
-        // Validate ZIP code
-        if (!providedZip.equals(profile.getZipCode())) {
-            return false;
-        }
-        
-        // Validate last transaction amount
-        BigDecimal lastTransactionAmount = transactionService
-            .getLastTransactionAmount(profile.getAccountNumber());
-            
-        return providedAmount.equals(lastTransactionAmount.toString());
-    }
+    public String getVoiceprintId() { return voiceprintId; }
+    public void setVoiceprintId(String voiceprintId) { this.voiceprintId = voiceprintId; }
 }
 ```
 
-### 3. Adding Custom Business Rules
+3. **Add to Brand Configuration**:
+```java
+@Override
+public List<AuthTokenDefinition> getTokenDefinitions() {
+    return Arrays.asList(
+        // ... existing tokens
+        AuthTokenDefinition.builder()
+                .name("VOICEPRINT")
+                .description("Voice Recognition")
+                .priority(110)
+                .maxAttempts(2)
+                .build()
+    );
+}
+```
 
-**Example**: Time-based authentication (only allow SSN during business hours)
+4. **That's it!** Spring will automatically:
+   - Find your validator
+   - Register it in the system
+   - Make it available for authentication
 
+### Adding a New Brand
+
+1. **Create Brand Configuration**:
 ```java
 @Component
-public class BusinessHoursSsnValidator implements TokenValidator {
-    
+public class TechBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
-    public String getTokenName() {
-        return "SSN";
-    }
+    public String getBrandCode() { return "TECH_BANK"; }
     
-    @Override
-    public String getBrand() {
-        return "BUSINESS_BANK";  // Only for Business Bank customers
-    }
-    
-    @Override
-    public boolean validate(String customerId, String providedSSN, CustomerProfile profile) {
-        // Check business hours first
-        LocalTime now = LocalTime.now();
-        if (now.isBefore(LocalTime.of(9, 0)) || now.isAfter(LocalTime.of(17, 0))) {
-            logger.info("SSN validation denied outside business hours for customer {}", customerId);
-            return false;
-        }
-        
-        // Normal SSN validation
-        return providedSSN.equals(profile.getSsn());
-    }
-    
-    @Override
-    public int getPriority() {
-        return 110; // Same priority is OK since different brand
-    }
+    // ... implement all required methods
 }
+```
+
+2. **Create Brand-Specific Validators** (optional):
+```java
+@Component
+public class TechBankBiometricValidator implements TokenValidator {
+    @Override
+    public String getBrand() { return "TECH_BANK"; }
+    @Override
+    public String getTokenName() { return "BIOMETRIC_ID"; }
+    
+    // ... tech bank specific biometric logic
+}
+```
+
+3. **Add Test Data**:
+```java
+// In repository
+CustomerProfile techBankCustomer = CustomerProfile.builder()
+        .customerId("TECH001")
+        .biometricId("BIOMETRIC_HASH_123")
+        // ... other fields
+        .build();
 ```
 
 ---
 
 ## 🧪 Testing Guide
 
-### Understanding the Test Structure
-
-```
-src/test/java/com/bank/ivr/auth/
-├── service/           # Service layer tests
-├── validator/         # Validator tests  
-├── integration/       # Full flow tests
-└── util/             # Test utilities
-```
-
-### Unit Test Example
+### Unit Testing Validators
 
 ```java
 @ExtendWith(MockitoExtension.class)
 class SsnValidatorTest {
     
-    @InjectMocks
-    private SsnValidator ssnValidator;
-    
-    @Test
-    void shouldValidateFullSsnMatch() {
-        // Given
-        CustomerProfile profile = CustomerProfile.builder()
-            .ssn("123456789")
-            .build();
-            
-        // When
-        boolean result = ssnValidator.validate("customer1", "123456789", profile);
-        
-        // Then
-        assertThat(result).isTrue();
-    }
-    
-    @Test
-    void shouldValidateLast4DigitsMatch() {
-        // Given
-        CustomerProfile profile = CustomerProfile.builder()
-            .ssn("123456789")
-            .build();
-            
-        // When  
-        boolean result = ssnValidator.validate("customer1", "6789", profile);
-        
-        // Then
-        assertThat(result).isTrue();
-    }
-    
-    @Test
-    void shouldRejectInvalidSsn() {
-        // Given
-        CustomerProfile profile = CustomerProfile.builder()
-            .ssn("123456789")
-            .build();
-            
-        // When
-        boolean result = ssnValidator.validate("customer1", "987654321", profile);
-        
-        // Then
-        assertThat(result).isFalse();
-    }
-}
-```
-
-### Integration Test Example
-
-```java
-@SpringBootTest
-class AuthenticationFlowIntegrationTest {
-    
-    @Autowired
-    private AuthenticationService authenticationService;
-    
-    @Test
-    void shouldCompleteFullAuthenticationFlow() {
-        // Given - Customer with known data
-        CustomerProfile profile = createTestCustomerProfile();
-        
-        // When - First authentication request (SSN)
-        AuthenticationRequest request1 = AuthenticationRequest.builder()
-            .attemptId("test-attempt")
-            .customerIdentifier(CustomerIdentifier.phone("555-1234"))
-            .brand("PREMIUM_BANK")
-            .providedTokens(List.of(
-                new ProvidedToken("SSN", "123456789")
-            ))
-            .build();
-            
-        AuthenticationResponse response1 = authenticationService.authenticate(request1);
-        
-        // Then - Should ask for PIN
-        assertThat(response1.getStatus()).isEqualTo(AuthStatus.PENDING_MORE_TOKENS);
-        assertThat(response1.getPrimaryTokenToAsk().getName()).isEqualTo("DEBIT_CARD_PIN");
-        assertThat(response1.getAuthenticatedTokens()).containsExactly("SSN");
-        
-        // When - Second authentication request (PIN)
-        AuthenticationRequest request2 = AuthenticationRequest.builder()
-            .attemptId("test-attempt") // Same attempt ID
-            .customerIdentifier(CustomerIdentifier.phone("555-1234"))
-            .brand("PREMIUM_BANK")
-            .providedTokens(List.of(
-                new ProvidedToken("DEBIT_CARD_PIN", "1234")
-            ))
-            .build();
-            
-        AuthenticationResponse response2 = authenticationService.authenticate(request2);
-        
-        // Then - Should be fully authenticated
-        assertThat(response2.getStatus()).isEqualTo(AuthStatus.AUTHENTICATED);
-        assertThat(response2.getAuthenticatedTokens()).containsExactlyInAnyOrder("SSN", "DEBIT_CARD_PIN");
-    }
-}
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-./mvnw test
-
-# Run specific test class
-./mvnw test -Dtest=SsnValidatorTest
-
-# Run tests with coverage
-./mvnw test jacoco:report
-```
-
-### Testing Best Practices
-
-#### Avoiding Unnecessary Stubbing Errors
-
-When writing tests with Mockito, you may encounter "UnnecessaryStubbing" errors if you set up mocks that aren't used in all test methods. Use `lenient()` to avoid these errors:
-
-```java
-@ExtendWith(MockitoExtension.class)
-class AuthenticationServiceTest {
-    
-    @Mock
-    private BrandFailurePolicyService failurePolicyService;
+    private SsnValidator validator;
+    private CustomerProfile customerProfile;
     
     @BeforeEach
     void setUp() {
-        // ✅ Use lenient() for mocks that might not be used in all tests
-        lenient().when(failurePolicyService.shouldFailAuthentication(any(), any(), any())).thenReturn(false);
-        lenient().when(failurePolicyService.getNextAlternativeToken(any(), any(), any())).thenReturn(null);
+        validator = new SsnValidator();
+        customerProfile = CustomerProfile.builder()
+                .customerId("CUST001")
+                .ssn("123456789")
+                .build();
+    }
+    
+    @Test
+    void shouldValidateFullSSN() {
+        // When
+        boolean result = validator.validate("CUST001", "123456789", customerProfile);
         
-        // ✅ Don't forget to import lenient
-        // import static org.mockito.Mockito.lenient;
+        // Then
+        assertTrue(result);
+    }
+    
+    @Test
+    void shouldValidateLast4Digits() {
+        // When
+        boolean result = validator.validate("CUST001", "6789", customerProfile);
+        
+        // Then
+        assertTrue(result);
+    }
+    
+    @Test
+    void shouldRejectWrongSSN() {
+        // When
+        boolean result = validator.validate("CUST001", "987654321", customerProfile);
+        
+        // Then
+        assertFalse(result);
+    }
+    
+    @Test
+    void shouldNormalizeFormattedSSN() {
+        // When
+        String normalized = validator.normalizeTokenValue("123-45-6789");
+        
+        // Then
+        assertEquals("123456789", normalized);
     }
 }
 ```
 
-#### Smart Re-asking Logic Tests
+### Integration Testing
 
-When testing the smart re-asking logic, verify these key scenarios:
+```java
+@SpringBootTest
+@AutoConfigureTestDatabase
+class AuthenticationIntegrationTest {
+    
+    @Autowired
+    private TestRestTemplate restTemplate;
+    
+    @Test
+    void shouldAuthenticateCustomerSuccessfully() {
+        // Given
+        AuthenticationRequest request = new AuthenticationRequest(
+                "session-123",
+                new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "+1234567890"),
+                null,
+                Arrays.asList(
+                        new ProvidedToken("DEBIT_CARD_PIN", "1234"),
+                        new ProvidedToken("SSN", "6789")
+                ),
+                "PREMIUM_BANK"
+        );
+        
+        // When
+        ResponseEntity<AuthenticationResponse> response = restTemplate.postForEntity(
+                "/api/v1/auth/customer",
+                request,
+                AuthenticationResponse.class
+        );
+        
+        // Then
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(AuthStatus.AUTHENTICATED, response.getBody().getStatus());
+    }
+}
+```
+
+### Testing Brand Configurations
 
 ```java
 @Test
-@DisplayName("Should allow re-asking token that was asked but user didn't provide")
-void shouldAllowReAskingUnprovidedToken() {
-    // Given - token was asked but user didn't provide it
-    context.addAskedToken("SSN");
-    // No validation failure marked
-    
+void shouldLoadAllBrandConfigurations() {
     // When
-    AuthenticationResponse response = authService.buildResponse(context, profile, "TEST_BANK");
+    Set<String> supportedBrands = brandConfigService.getAvailableBrands();
     
     // Then
-    assertEquals("SSN", response.getPrimaryTokenToAsk().getName());
-    assertTrue(context.canReAskToken("SSN"));
+    assertThat(supportedBrands).contains("PREMIUM_BANK", "COMMUNITY_BANK");
 }
 
 @Test
-@DisplayName("Should not re-ask token that user provided but failed validation")
-void shouldNotReAskFailedToken() {
-    // Given - token was asked and user provided it but validation failed
-    context.addAskedToken("SSN");
-    context.markAskedTokenValidationFailure("SSN");
-    
+void shouldReturnCorrectRequiredTokensForBrand() {
     // When
-    AuthenticationResponse response = authService.buildResponse(context, profile, "TEST_BANK");
+    List<String> requiredTokens = brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK");
     
     // Then
-    assertNotEquals("SSN", response.getPrimaryTokenToAsk().getName());
-    assertFalse(context.canReAskToken("SSN"));
+    assertThat(requiredTokens).containsExactly("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
 }
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🆕 Recent Improvements Deep Dive
 
-### Common Issues and Solutions
+### 1. Codebase Cleanup (v1.2)
 
-#### 1. **"No validator found for token 'XYZ'"**
+**What Changed**:
+- Removed 8 deprecated methods across multiple classes
+- Simplified `EncryptionUtil` to only have `hash()` and `verify()` methods
+- Cleaned up controller logging to focus on essential information
+- Replaced wildcard imports with specific imports
+- Removed unused `SimplifiedRetryStateMachine` class
 
-**Problem**: Created a new validator but system can't find it.
+**Impact**:
+- **475 lines of code removed**
+- **Faster compilation** due to cleaner imports
+- **Better performance** with simplified method calls
+- **Clearer APIs** with deprecated methods gone
 
-**Solutions**:
+### 2. Simplified Encryption
+
+**Before**:
 ```java
-// ✅ Make sure your validator has @Component annotation
-@Component  // This is required!
-public class MyValidator implements TokenValidator { ... }
-
-// ✅ Make sure it's in the right package
-package com.bank.ivr.auth.validator.impl; // Spring scans this package
-
-// ✅ Check the token name matches exactly
-@Override
-public String getTokenName() {
-    return "MY_TOKEN"; // This must match request token name
-}
-
-// ✅ Make sure you implement getBrand() method
-@Override
-public String getBrand() {
-    return "DEFAULT"; // Use "DEFAULT" unless brand-specific
-}
+// Multiple methods doing similar things
+String hash1 = EncryptionUtil.hash(text);
+String hash2 = EncryptionUtil.hashPin(pin);        // Deprecated wrapper
+boolean valid1 = EncryptionUtil.verify(text, hash);
+boolean valid2 = EncryptionUtil.verifyPin(pin, hash); // Deprecated wrapper
 ```
 
-#### 2. **"Multiple validators found for brand 'X' and token 'Y'"**
-
-**Problem**: Two validators have the same brand and token combination.
-
-**Solution**: Each brand+token combination must be unique:
+**After**:
 ```java
-// ❌ BAD: Two validators for same brand+token
-@Component
-public class FirstSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }
-}
-
-@Component
-public class SecondSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }  // ❌ DUPLICATE!
-}
-
-// ✅ GOOD: Different brands or tokens
-@Component
-public class PremiumSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "PREMIUM_BANK"; }
-}
-
-@Component
-public class CommunityPinValidator implements TokenValidator {
-    public String getTokenName() { return "PIN"; }          // Different token
-    public String getBrand() { return "PREMIUM_BANK"; }     // Same brand = OK
-}
+// Clean, simple API
+String hash = EncryptionUtil.hash(text);    // Works for everything
+boolean valid = EncryptionUtil.verify(text, hash); // Works for everything
 ```
 
-#### 3. **Tests failing with NullPointerException**
+### 3. Streamlined Controller Logging
 
-**Problem**: Missing mock setup.
-
-**Solution**:
+**Before** (verbose):
 ```java
-@BeforeEach
-void setUp() {
-    // ✅ Always set up required mocks
-    when(mockCustomerProfile.getSsn()).thenReturn("123456789");
-    when(mockContext.getBrand()).thenReturn("PREMIUM_BANK");
-}
+logger.info("AUTH_REQUEST_STARTED - SessionId: {}, AttemptId: {}, Brand: {}, CustomerRef: {}, IsNewAttempt: {}, ProcessingStartTime: {}", 
+           sessionId, attemptId, brand, request.getCustomerIdentifier(), request.isNewAttempt(), startTime);
 ```
 
-#### 3. **"No validator found for brand 'X' and token 'Y'"**
-
-**Problem**: Request includes brand but no brand-specific validator exists.
-
-**Solutions**:
+**After** (clean):
 ```java
-// ✅ Check if DEFAULT validator exists as fallback
-@Component
-public class SsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "DEFAULT"; } // Fallback for all brands
-}
-
-// ✅ Or create brand-specific validator
-@Component
-public class MyBrandSsnValidator implements TokenValidator {
-    public String getTokenName() { return "SSN"; }
-    public String getBrand() { return "MY_BRAND"; } // Specific to your brand
-}
-
-// ✅ Check brand name matches exactly (case-sensitive)
-// Request: "PREMIUM_BANK" vs Validator: "premium_bank" = NO MATCH
+logger.info("Authentication request started - SessionId: {}, Brand: {}, Customer: {}", 
+           sessionId, brand, request.getCustomerIdentifier());
 ```
 
-#### 4. **Authentication always fails**
+### 4. Import Statement Cleanup
 
-**Debug checklist**:
+**Before**:
 ```java
-// ✅ Check customer profile data
-logger.debug("Customer profile: {}", customerProfile);
-
-// ✅ Check token normalization  
-String normalized = validator.normalizeTokenValue(providedValue);
-logger.debug("Provided: '{}', Normalized: '{}'", providedValue, normalized);
-
-// ✅ Check validator selection (now includes brand)
-TokenValidator validator = tokenValidationService.getValidator(brand, tokenName);
-logger.debug("Using validator: {} for brand: {}", validator.getClass().getSimpleName(), brand);
-
-// ✅ Check brand mapping
-logger.debug("Available brand+token combinations: {}", 
-            tokenValidationService.getSupportedBrandTokenCombinations());
+import java.util.*;  // Imports everything - unclear dependencies
+import com.bank.ivr.auth.model.domain.*;  // Imports all domain classes
 ```
 
-### Debugging Tips
-
-#### Enable Debug Logging
-```yaml
-# application.yml
-logging:
-  level:
-    com.bank.ivr.auth: DEBUG
+**After**:
+```java
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
 ```
 
-#### Use IDE Debugger
-1. Set breakpoint in `TokenValidationService.validateToken()`
-2. Step through validation logic
-3. Check variable values at each step
+### 5. Test Improvements
 
-#### Test Individual Components
+**Updated test expectations** to match simplified controller behavior:
 ```java
-// Test validator in isolation
-@Test
-void debugValidator() {
-    SsnValidator validator = new SsnValidator();
-    CustomerProfile profile = // ... create test profile
-    
-    boolean result = validator.validate("test", "123456789", profile);
-    // Set breakpoint here and inspect values
-}
+// Old test (would fail)
+verify(brandConfigService).getMaxOverallAttemptsForBrand("PREMIUM_BANK");
+verify(brandConfigService).getRequiredTokensForBrand("PREMIUM_BANK");
+
+// New test (current behavior)
+verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
+// Note: Other methods called by orchestrator, not controller
 ```
 
 ---
 
-## 🎓 Learning Path
+## 🔍 Troubleshooting
 
-### Beginner (Week 1-2)
-1. ✅ Understand the purpose (IVR authentication)
-2. ✅ Read through `TokenValidator` interface
-3. ✅ Study `SsnValidator` implementation  
-4. ✅ Run existing tests and see them pass
-5. ✅ Create a simple new validator (like `DateOfBirthValidator`)
+### Common Issues After Recent Updates
 
-### Intermediate (Week 3-4)
-1. ✅ Understand `TokenValidationService` auto-discovery
-2. ✅ Study `AuthenticationContext` state management
-3. ✅ Learn brand configuration system
-4. ✅ Add a new brand configuration
-5. ✅ Write comprehensive tests
+#### 1. Compilation Errors
 
-### Advanced (Month 2+)
-1. ✅ Master the retry management system
-2. ✅ Understand security implications
-3. ✅ Add complex validators with external dependencies
-4. ✅ Performance optimization
-5. ✅ Production deployment considerations
+**Error**: `Cannot resolve method 'hashPin'`
+```java
+// ❌ This will fail
+String hash = EncryptionUtil.hashPin("1234");
+```
 
-### Expert (Month 3+)
-1. ✅ Design new authentication flows
-2. ✅ Implement fraud detection features
-3. ✅ Add monitoring and analytics
-4. ✅ Scale for high volume
-5. ✅ Security auditing and compliance
+**Solution**: Use the simplified method
+```java
+// ✅ This works
+String hash = EncryptionUtil.hash("1234");
+```
+
+#### 2. Test Failures
+
+**Error**: Test expecting deprecated method calls
+```java
+// ❌ This test will fail
+verify(brandConfigService).getMaxOverallAttemptsForBrand(any());
+```
+
+**Solution**: Update test to match current behavior
+```java
+// ✅ This test will pass
+verify(brandConfigService).isBrandSupported(any());
+```
+
+#### 3. Import Errors
+
+**Error**: `Cannot resolve symbol` with wildcard imports
+```java
+// ❌ May cause issues
+import java.util.*;
+```
+
+**Solution**: Use specific imports
+```java
+// ✅ Clear and explicit
+import java.util.List;
+import java.util.Map;
+```
+
+### General Debugging Tips
+
+1. **Check Logs**: Look for validator registration messages at startup
+2. **Verify Brand Support**: Ensure your brand is in the supported brands list
+3. **Test Validators**: Create unit tests for custom validators
+4. **Use Debug Logging**: Enable debug level for `com.bank.ivr.auth` package
+
+### Getting Help
+
+- **Documentation**: Check this guide and the bank onboarding guide
+- **Code Comments**: Most classes have detailed JavaDoc
+- **Tests**: Look at existing tests for examples
+- **Cleanup Summary**: See `CODEBASE_CLEANUP_SUMMARY.md` for recent changes
 
 ---
 
-## 📚 Additional Resources
+## 🎉 Conclusion
 
-### Key Spring Concepts Used
-- **Dependency Injection**: `@Autowired`, `@Component`
-- **Configuration**: `@Configuration`, `@Bean`
-- **Testing**: `@SpringBootTest`, `@MockBean`
+You now understand the IVR Authentication System! Here's what you've learned:
 
-### Design Patterns Used
-- **Strategy Pattern**: `TokenValidator` implementations
-- **Service Layer Pattern**: Business logic in services
-- **Builder Pattern**: Object construction
-- **Template Method**: Retry management strategies
+✅ **Architecture**: Strategy pattern with brand-aware validation  
+✅ **Components**: Controllers, services, validators, configurations  
+✅ **Flow**: Request → Validation → Smart Re-asking → Response  
+✅ **Recent Changes**: Simplified APIs and cleaner code  
+✅ **Testing**: Unit tests, integration tests, and debugging  
 
-### Useful Reading
-- Spring Framework Documentation
-- Clean Code by Robert Martin
-- Design Patterns: Elements of Reusable Object-Oriented Software
+### Next Steps
+
+1. **Try It Out**: Run the application and test with different brands
+2. **Create a Validator**: Follow the examples to add a new token type
+3. **Add a Brand**: Create your own bank configuration
+4. **Read More**: Check out the [Bank Onboarding Guide](BANK_ONBOARDING_GUIDE.md) for detailed implementation steps
+
+### Key Takeaways
+
+- **Flexibility**: Easy to add new authentication methods
+- **Security**: Built-in retry management and secure hashing
+- **Brand Awareness**: Each bank can have unique rules
+- **Simplicity**: Clean APIs after recent improvements
+- **Testability**: Comprehensive testing support
+
+Happy coding! 🚀
 
 ---
 
-## 🎉 Congratulations!
-
-You now have a solid foundation to understand and extend this IVR authentication system. Start with simple validators, gradually work your way up to complex features, and don't hesitate to run tests and debug when things don't work as expected.
-
-Remember: **Every expert was once a beginner!** 🚀 
+*For more detailed implementation guidance, see [BANK_ONBOARDING_GUIDE.md](BANK_ONBOARDING_GUIDE.md)* 

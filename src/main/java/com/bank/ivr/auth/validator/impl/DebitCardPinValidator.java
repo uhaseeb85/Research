@@ -44,7 +44,7 @@ public class DebitCardPinValidator implements TokenValidator {
         
         try {
             // Use encryption utility to verify the PIN against the stored hash
-            boolean isValid = EncryptionUtil.verifyPin(normalizedProvided, customerProfile.getHashedPin());
+            boolean isValid = EncryptionUtil.verify(normalizedProvided, customerProfile.getHashedPin());
             
             if (isValid) {
                 logger.debug("PIN validation successful for customer {}", customerIdentifierValue);

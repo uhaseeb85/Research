@@ -89,38 +89,7 @@ public class TokenValidationService {
         }
     }
     
-    /**
-     * Backward compatibility method for validation without explicit brand.
-     * This method will try to find a DEFAULT brand validator first, then any available validator.
-     * 
-     * @deprecated Use validateToken(String, String, String, String, CustomerProfile) instead
-     */
-    @Deprecated
-    public boolean validateToken(String tokenName, String customerIdentifierValue, 
-                               String providedTokenValue, CustomerProfile customerProfile) {
-        logger.debug("Using deprecated validateToken method for token '{}' - consider specifying brand", tokenName);
-        
-        // Try DEFAULT brand first
-        TokenValidator validator = getValidatorForBrandAndToken("DEFAULT", tokenName);
-        if (validator == null) {
-            // Fallback: try to find any validator for this token
-            validator = findAnyValidatorForToken(tokenName);
-        }
-        
-        if (validator == null) {
-            logger.warn("No validator found for token '{}' (no brand specified)", tokenName);
-            return false;
-        }
-        
-        try {
-            boolean isValid = validator.validate(customerIdentifierValue, providedTokenValue, customerProfile);
-            logger.debug("Token '{}' validation result: {} (no brand specified)", tokenName, isValid);
-            return isValid;
-        } catch (Exception e) {
-            logger.error("Error validating token '{}' (no brand specified): {}", tokenName, e.getMessage(), e);
-            return false;
-        }
-    }
+
     
     /**
      * Checks if a validator exists for the given brand and token name.
@@ -133,15 +102,7 @@ public class TokenValidationService {
         return validatorMap.containsKey(createCompositeKey(brand, tokenName));
     }
     
-    /**
-     * Backward compatibility method to check if a validator exists for a token (any brand).
-     * 
-     * @deprecated Use hasValidator(String, String) instead
-     */
-    @Deprecated
-    public boolean hasValidator(String tokenName) {
-        return hasValidator("DEFAULT", tokenName) || findAnyValidatorForToken(tokenName) != null;
-    }
+
     
     /**
      * Gets the validator for the given brand and token name.
@@ -154,16 +115,7 @@ public class TokenValidationService {
         return getValidatorForBrandAndToken(brand, tokenName);
     }
     
-    /**
-     * Backward compatibility method to get a validator without specifying brand.
-     * 
-     * @deprecated Use getValidator(String, String) instead
-     */
-    @Deprecated
-    public TokenValidator getValidator(String tokenName) {
-        TokenValidator validator = getValidatorForBrandAndToken("DEFAULT", tokenName);
-        return validator != null ? validator : findAnyValidatorForToken(tokenName);
-    }
+
     
     /**
      * Gets all available brand+token combinations that have validators.
@@ -187,17 +139,7 @@ public class TokenValidationService {
                 .collect(java.util.stream.Collectors.toSet());
     }
     
-    /**
-     * Backward compatibility method to get all supported token names.
-     * 
-     * @deprecated Use getSupportedTokenNamesForBrand(String) instead
-     */
-    @Deprecated
-    public java.util.Set<String> getSupportedTokenNames() {
-        return validatorMap.values().stream()
-                .map(TokenValidator::getTokenName)
-                .collect(java.util.stream.Collectors.toSet());
-    }
+
     
     /**
      * Normalizes a token value using the appropriate validator for a specific brand.
@@ -215,22 +157,7 @@ public class TokenValidationService {
         return tokenValue;
     }
     
-    /**
-     * Backward compatibility method for normalizing token values without brand.
-     * 
-     * @deprecated Use normalizeTokenValue(String, String, String) instead
-     */
-    @Deprecated
-    public String normalizeTokenValue(String tokenName, String tokenValue) {
-        TokenValidator validator = getValidatorForBrandAndToken("DEFAULT", tokenName);
-        if (validator == null) {
-            validator = findAnyValidatorForToken(tokenName);
-        }
-        if (validator != null) {
-            return validator.normalizeTokenValue(tokenValue);
-        }
-        return tokenValue;
-    }
+
     
     /**
      * Creates a composite key for brand and token lookup.
@@ -254,15 +181,7 @@ public class TokenValidationService {
         return validatorMap.get(createCompositeKey(brand, tokenName));
     }
     
-    /**
-     * Fallback method to find any validator for a token (used for backward compatibility).
-     */
-    private TokenValidator findAnyValidatorForToken(String tokenName) {
-        return validatorMap.values().stream()
-                .filter(validator -> tokenName.equals(validator.getTokenName()))
-                .findFirst()
-                .orElse(null);
-    }
+
     
     /**
      * Logs the current validator mapping for debugging purposes.

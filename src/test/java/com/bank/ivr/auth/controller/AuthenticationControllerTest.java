@@ -525,8 +525,8 @@ class AuthenticationControllerTest {
     class BrandConfigurationIntegration {
 
         @Test
-        @DisplayName("Should log brand configuration details in request processing")
-        void shouldLogBrandConfigurationDetails() throws Exception {
+        @DisplayName("Should validate brand support in request processing")
+        void shouldValidateBrandSupportInRequestProcessing() throws Exception {
             // Given
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -544,11 +544,9 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isOk());
 
-            // Verify brand configuration service was called for validation and logging
+            // Verify brand configuration service was called for validation
             verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
-            verify(brandConfigService).getMaxOverallAttemptsForBrand("PREMIUM_BANK");
-            verify(brandConfigService).getRequiredTokensForBrand("PREMIUM_BANK");
-            verify(brandConfigService).isConcurrentTokenAuthAllowed("PREMIUM_BANK");
+            // Note: Other brand config methods are called by the orchestrator, not the controller
         }
 
         @Test

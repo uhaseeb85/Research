@@ -12,44 +12,12 @@ public class EncryptionUtil {
     private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
     
     /**
-     * Hashes a PIN using BCrypt.
+     * Generates a hash for a given input string using BCrypt.
+     * This is the primary hashing method that should be used for all hashing operations.
      * 
-     * @param pin the plain text PIN to hash
-     * @return the hashed PIN
-     */
-    public static String hashPin(String pin) {
-        if (pin == null) {
-            throw new IllegalArgumentException("PIN cannot be null");
-        }
-        return PASSWORD_ENCODER.encode(pin);
-    }
-    
-    /**
-     * Verifies a plain text PIN against a hashed PIN.
-     * 
-     * @param plainTextPin the plain text PIN provided by the user
-     * @param hashedPin the stored hashed PIN
-     * @return true if the PIN matches, false otherwise
-     */
-    public static boolean verifyPin(String plainTextPin, String hashedPin) {
-        if (plainTextPin == null || hashedPin == null) {
-            return false;
-        }
-        
-        try {
-            return PASSWORD_ENCODER.matches(plainTextPin, hashedPin);
-        } catch (Exception e) {
-            // Log the error but don't expose details for security
-            return false;
-        }
-    }
-    
-    /**
-     * Generates a hash for a given input string.
-     * General purpose hashing method.
-     * 
-     * @param input the input string to hash
+     * @param input the input string to hash (PIN, password, etc.)
      * @return the hashed string
+     * @throws IllegalArgumentException if input is null
      */
     public static String hash(String input) {
         if (input == null) {
@@ -59,24 +27,27 @@ public class EncryptionUtil {
     }
     
     /**
-     * Verifies a plain text input against a hash.
-     * General purpose verification method.
+     * Verifies a plain text input against a hash using BCrypt.
+     * This is the primary verification method that should be used for all verification operations.
      * 
-     * @param plainText the plain text input
-     * @param hash the stored hash
+     * @param plainText the plain text input (PIN, password, etc.)
+     * @param hashedText the stored hash to verify against
      * @return true if the input matches the hash, false otherwise
      */
-    public static boolean verify(String plainText, String hash) {
-        if (plainText == null || hash == null) {
+    public static boolean verify(String plainText, String hashedText) {
+        if (plainText == null || hashedText == null) {
             return false;
         }
         
         try {
-            return PASSWORD_ENCODER.matches(plainText, hash);
+            return PASSWORD_ENCODER.matches(plainText, hashedText);
         } catch (Exception e) {
+            // Log the error but don't expose details for security
             return false;
         }
     }
+    
+
     
     // Private constructor to prevent instantiation
     private EncryptionUtil() {

@@ -88,42 +88,9 @@ public class EligibilityService {
         return eligibleTokens;
     }
     
-    /**
-     * Maintains backward compatibility for existing code that doesn't specify brand.
-     * @deprecated Use {@link #determineEligibleTokens(CustomerProfile, String)} instead.
-     */
-    @Deprecated
-    public List<String> determineEligibleTokens(CustomerProfile customerProfile) {
-        logger.warn("determineEligibleTokens called without brand context for customer: {}. " +
-                   "This is deprecated - brand should be specified for proper brand-aware eligibility.", 
-                   customerProfile.getCustomerId());
-        
-        // Use a fallback approach - get all possible tokens across all brands
-        // This is not ideal but maintains backward compatibility
-        return determineFallbackEligibleTokens(customerProfile, getAllPossibleTokens(), "DEFAULT");
-    }
+
     
-    /**
-     * Gets all possible token names across all brand configurations.
-     */
-    private List<String> getAllPossibleTokens() {
-        List<String> allTokens = new ArrayList<>();
-        
-        // Loop through all brands and collect their token names
-        for (String brand : brandConfigService.getAvailableBrands()) {
-            List<AuthTokenDefinition> tokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
-            
-            // Add each token name if it's not already in the list
-            for (AuthTokenDefinition tokenDef : tokenDefinitions) {
-                String tokenName = tokenDef.getName();
-                if (!allTokens.contains(tokenName)) {
-                    allTokens.add(tokenName);
-                }
-            }
-        }
-        
-        return allTokens;
-    }
+
     
     /**
      * Fallback logic for token eligibility when rules fail, with brand awareness.

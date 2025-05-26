@@ -8,7 +8,10 @@ import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Authentication configuration for Community Bank brand.

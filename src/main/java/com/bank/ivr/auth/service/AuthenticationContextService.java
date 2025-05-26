@@ -2,7 +2,10 @@ package com.bank.ivr.auth.service;
 
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.AuthenticationSession;
+import com.bank.ivr.auth.model.domain.AttemptState;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.TokenState;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.repository.AuthenticationContextRepository;
 import org.slf4j.Logger;
@@ -11,7 +14,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service responsible for managing brand-aware authentication context creation and lifecycle.
@@ -72,20 +81,35 @@ public class AuthenticationContextService {
         logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, RequiredTokens: {}, MaxOverallAttempts: {}", 
                     brand, eligibleTokens, requiredTokens, maxOverallAttempts);
         
-        return AuthenticationContext.builder()
+        // Create session information
+        AuthenticationSession session = AuthenticationSession.builder()
                 .attemptId(attemptId)
                 .sessionId(request.getSessionId())
                 .customerIdentifier(request.getCustomerIdentifier())
-                .brand(brand)  // Store brand information in context
+                .brand(brand)
                 .startTime(LocalDateTime.now())
-                .tokenAttemptsRemaining(tokenAttempts)
-                .overallAttemptsRemaining(maxOverallAttempts)
+                .build();
+        
+        // Create token state
+        TokenState tokenState = TokenState.builder()
                 .eligibleTokens(eligibleTokens)
                 .authenticatedTokens(new ArrayList<>())
                 .requiredTokensForFullAuth(new ArrayList<>(requiredTokens))
-                .currentStatus(com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus.PENDING_PRIMARY_TOKEN)
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())
+                .build();
+        
+        // Create attempt state
+        AttemptState attemptState = AttemptState.builder()
+                .tokenAttemptsRemaining(tokenAttempts)
+                .overallAttemptsRemaining(maxOverallAttempts)
+                .currentStatus(com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus.PENDING_PRIMARY_TOKEN)
+                .build();
+        
+        return AuthenticationContext.builder()
+                .session(session)
+                .tokenState(tokenState)
+                .attemptState(attemptState)
                 .build();
     }
     

@@ -32,36 +32,64 @@ public class TokenProcessingService {
     public void processProvidedTokens(AuthenticationRequest request, AuthenticationContext context, 
                                      CustomerProfile customerProfile) {
         if (request.getProvidedTokens() == null || request.getProvidedTokens().isEmpty()) {
-            // No tokens provided - decrement attempts for last asked token
-            if (context.getLastAskedToken() != null) {
-                context.decrementTokenAttempts(context.getLastAskedToken());
-                context.decrementOverallAttempts();
-                
-                logger.debug("No tokens provided - decremented attempts for lastAskedToken '{}' for attempt: {}", 
-                           context.getLastAskedToken(), context.getAttemptId());
-            }
+            handleNoTokensProvided(context);
             return;
         }
         
         String brand = context.getBrand();
         String lastAskedToken = context.getLastAskedToken();
-        boolean userProvidedAskedToken = false;
         
         logger.debug("Processing {} tokens for brand '{}' and attempt '{}', lastAskedToken: '{}'", 
                     request.getProvidedTokens().size(), brand, context.getAttemptId(), lastAskedToken);
         
-        // First, check if user provided the token we specifically asked for
-        for (ProvidedToken providedToken : request.getProvidedTokens()) {
-            if (lastAskedToken != null && lastAskedToken.equals(providedToken.getTokenName())) {
-                userProvidedAskedToken = true;
-                logger.debug("User provided the token we asked for: '{}' for attempt: {}", 
-                           lastAskedToken, context.getAttemptId());
-                break;
-            }
+        boolean userProvidedAskedToken = checkIfUserProvidedAskedToken(request.getProvidedTokens(), lastAskedToken, context);
+        
+        processEachProvidedToken(request.getProvidedTokens(), context, customerProfile, lastAskedToken);
+        
+        handleUnprovidedAskedToken(lastAskedToken, userProvidedAskedToken, context);
+    }
+    
+    /**
+     * Handles the case when no tokens are provided by the customer.
+     */
+    private void handleNoTokensProvided(AuthenticationContext context) {
+        if (context.getLastAskedToken() != null) {
+            context.decrementTokenAttempts(context.getLastAskedToken());
+            context.decrementOverallAttempts();
+            
+            logger.debug("No tokens provided - decremented attempts for lastAskedToken '{}' for attempt: {}", 
+                       context.getLastAskedToken(), context.getAttemptId());
+        }
+    }
+    
+    /**
+     * Checks if the user provided the token that was specifically asked for.
+     */
+    private boolean checkIfUserProvidedAskedToken(java.util.List<ProvidedToken> providedTokens, 
+                                                 String lastAskedToken, AuthenticationContext context) {
+        if (lastAskedToken == null) {
+            return false;
         }
         
-        // Process each provided token
-        for (ProvidedToken providedToken : request.getProvidedTokens()) {
+        for (ProvidedToken providedToken : providedTokens) {
+            if (lastAskedToken.equals(providedToken.getTokenName())) {
+                logger.debug("User provided the token we asked for: '{}' for attempt: {}", 
+                           lastAskedToken, context.getAttemptId());
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Processes each individual token provided by the customer.
+     */
+    private void processEachProvidedToken(java.util.List<ProvidedToken> providedTokens, 
+                                        AuthenticationContext context, CustomerProfile customerProfile, 
+                                        String lastAskedToken) {
+        String brand = context.getBrand();
+        
+        for (ProvidedToken providedToken : providedTokens) {
             boolean isValid = tokenValidationService.validateToken(
                     providedToken.getTokenName(),
                     brand,
@@ -71,36 +99,71 @@ public class TokenProcessingService {
             );
             
             if (isValid) {
-                context.addAuthenticatedToken(providedToken.getTokenName());
-                logger.debug("Token {} validated successfully for brand '{}' and attempt: {}", 
-                           providedToken.getTokenName(), brand, context.getAttemptId());
+                handleSuccessfulValidation(providedToken, context, brand);
             } else {
-                context.decrementTokenAttempts(providedToken.getTokenName());
-                context.decrementOverallAttempts();
-                
-                // SMART RE-ASKING LOGIC: If user provided the token we specifically asked for
-                // but it failed validation, mark it to prevent re-asking the same token
-                if (lastAskedToken != null && lastAskedToken.equals(providedToken.getTokenName())) {
-                    context.markAskedTokenValidationFailure(providedToken.getTokenName());
-                    logger.debug("User provided asked token '{}' but validation failed - marked for no re-asking for attempt: {}", 
-                               providedToken.getTokenName(), context.getAttemptId());
-                }
-                
-                // Check if this token has failed all attempts
-                if (!context.hasRemainingAttemptsForToken(providedToken.getTokenName())) {
-                    context.addFailedToken(providedToken.getTokenName());
-                    logger.debug("Token {} has no remaining attempts - marked as failed for attempt: {}", 
-                               providedToken.getTokenName(), context.getAttemptId());
-                }
-                
-                logger.debug("Token {} validation failed for brand '{}' and attempt: {}, remainingAttempts: {}", 
-                           providedToken.getTokenName(), brand, context.getAttemptId(), 
-                           context.getTokenAttemptsRemaining().get(providedToken.getTokenName()));
+                handleFailedValidation(providedToken, context, lastAskedToken, brand);
             }
         }
+    }
+    
+    /**
+     * Handles successful token validation.
+     */
+    private void handleSuccessfulValidation(ProvidedToken providedToken, AuthenticationContext context, String brand) {
+        context.addAuthenticatedToken(providedToken.getTokenName());
+        logger.debug("Token {} validated successfully for brand '{}' and attempt: {}", 
+                   providedToken.getTokenName(), brand, context.getAttemptId());
+    }
+    
+    /**
+     * Handles failed token validation and applies smart re-asking logic.
+     */
+    private void handleFailedValidation(ProvidedToken providedToken, AuthenticationContext context, 
+                                      String lastAskedToken, String brand) {
+        updateTokenAttempts(providedToken, context);
+        applySmartReaskingLogic(providedToken, context, lastAskedToken);
+        checkAndMarkFailedToken(providedToken, context);
         
-        // If we asked for a token but user didn't provide it at all, they might provide
-        // a different token instead - this is okay and we can re-ask the original token later
+        logger.debug("Token {} validation failed for brand '{}' and attempt: {}, remainingAttempts: {}", 
+                   providedToken.getTokenName(), brand, context.getAttemptId(), 
+                   context.getTokenAttemptsRemaining().get(providedToken.getTokenName()));
+    }
+    
+    /**
+     * Updates token and overall attempt counts after a failed validation.
+     */
+    private void updateTokenAttempts(ProvidedToken providedToken, AuthenticationContext context) {
+        context.decrementTokenAttempts(providedToken.getTokenName());
+        context.decrementOverallAttempts();
+    }
+    
+    /**
+     * Applies smart re-asking logic when a specifically asked token fails validation.
+     */
+    private void applySmartReaskingLogic(ProvidedToken providedToken, AuthenticationContext context, String lastAskedToken) {
+        if (lastAskedToken != null && lastAskedToken.equals(providedToken.getTokenName())) {
+            context.markAskedTokenValidationFailure(providedToken.getTokenName());
+            logger.debug("User provided asked token '{}' but validation failed - marked for no re-asking for attempt: {}", 
+                       providedToken.getTokenName(), context.getAttemptId());
+        }
+    }
+    
+    /**
+     * Checks if a token has exhausted all attempts and marks it as failed if so.
+     */
+    private void checkAndMarkFailedToken(ProvidedToken providedToken, AuthenticationContext context) {
+        if (!context.hasRemainingAttemptsForToken(providedToken.getTokenName())) {
+            context.addFailedToken(providedToken.getTokenName());
+            logger.debug("Token {} has no remaining attempts - marked as failed for attempt: {}", 
+                       providedToken.getTokenName(), context.getAttemptId());
+        }
+    }
+    
+    /**
+     * Handles the case when the user didn't provide the specifically asked token.
+     */
+    private void handleUnprovidedAskedToken(String lastAskedToken, boolean userProvidedAskedToken, 
+                                          AuthenticationContext context) {
         if (lastAskedToken != null && !userProvidedAskedToken) {
             logger.debug("User didn't provide the asked token '{}' - can re-ask this token later for attempt: {}", 
                        lastAskedToken, context.getAttemptId());
