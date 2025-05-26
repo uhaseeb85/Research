@@ -22,13 +22,10 @@ public class TokenSelectionService {
     private static final Logger logger = LoggerFactory.getLogger(TokenSelectionService.class);
     
     private final List<TokenSelectionRule> tokenSelectionRules;
-    private final BrandAuthConfigurationService brandConfigService;
     
     @Autowired
-    public TokenSelectionService(List<TokenSelectionRule> tokenSelectionRules, 
-                                BrandAuthConfigurationService brandConfigService) {
+    public TokenSelectionService(List<TokenSelectionRule> tokenSelectionRules) {
         this.tokenSelectionRules = tokenSelectionRules;
-        this.brandConfigService = brandConfigService;
     }
     
     /**
