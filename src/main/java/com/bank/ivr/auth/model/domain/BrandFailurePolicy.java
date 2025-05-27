@@ -1,11 +1,11 @@
 package com.bank.ivr.auth.model.domain;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Defines brand-specific policies for handling authentication failures.
@@ -167,6 +167,11 @@ public class BrandFailurePolicy {
      * Checks if all alternatives for failed tokens have been exhausted.
      */
     private boolean hasExhaustedAllAlternatives(AuthenticationContext context) {
+        // If no tokens have failed yet, alternatives are not exhausted
+        if (context.getFailedTokens().isEmpty()) {
+            return false;
+        }
+        
         for (String failedToken : context.getFailedTokens()) {
             List<String> alternatives = getAlternativesForToken(failedToken);
             for (String alternative : alternatives) {
