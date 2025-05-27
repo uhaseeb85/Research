@@ -1,15 +1,16 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.validator.TokenValidator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.validator.TokenValidator;
 
 /**
  * Service for managing token validation operations.
@@ -93,13 +94,24 @@ public class TokenValidationService {
     
     /**
      * Checks if a validator exists for the given brand and token name.
+     * Includes fallback to DEFAULT brand if brand-specific validator not found.
      * 
      * @param brand the brand code
      * @param tokenName the token name to check
      * @return true if a validator exists, false otherwise
      */
     public boolean hasValidator(String brand, String tokenName) {
-        return validatorMap.containsKey(createCompositeKey(brand, tokenName));
+        // First check brand-specific validator
+        if (validatorMap.containsKey(createCompositeKey(brand, tokenName))) {
+            return true;
+        }
+        
+        // If not found and brand is not DEFAULT, check DEFAULT brand as fallback
+        if (!"DEFAULT".equals(brand)) {
+            return validatorMap.containsKey(createCompositeKey("DEFAULT", tokenName));
+        }
+        
+        return false;
     }
     
 
@@ -176,9 +188,21 @@ public class TokenValidationService {
     
     /**
      * Gets the validator for a specific brand and token combination.
+     * If no brand-specific validator is found, falls back to DEFAULT brand.
      */
     private TokenValidator getValidatorForBrandAndToken(String brand, String tokenName) {
-        return validatorMap.get(createCompositeKey(brand, tokenName));
+        // First try brand-specific validator
+        TokenValidator validator = validatorMap.get(createCompositeKey(brand, tokenName));
+        
+        // If not found and brand is not DEFAULT, try DEFAULT brand as fallback
+        if (validator == null && !"DEFAULT".equals(brand)) {
+            validator = validatorMap.get(createCompositeKey("DEFAULT", tokenName));
+            if (validator != null) {
+                logger.debug("Using DEFAULT validator for brand '{}' and token '{}'", brand, tokenName);
+            }
+        }
+        
+        return validator;
     }
     
 
