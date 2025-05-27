@@ -90,7 +90,6 @@ public class AuthenticationContextService {
         TokenState tokenState = TokenState.builder()
                 .eligibleTokens(eligibleTokens)
                 .authenticatedTokens(new ArrayList<>())
-
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())
                 .build();
