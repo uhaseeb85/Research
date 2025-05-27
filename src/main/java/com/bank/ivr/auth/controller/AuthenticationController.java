@@ -1,19 +1,32 @@
 package com.bank.ivr.auth.controller;
 
-import com.bank.ivr.auth.model.request.AuthenticationRequest;
-import com.bank.ivr.auth.model.response.AuthenticationResponse;
-import com.bank.ivr.auth.service.AuthenticationOrchestrator;
-import com.bank.ivr.auth.service.BrandAuthConfigurationService;
-import com.bank.ivr.auth.util.LoggingUtil;
-import jakarta.validation.Valid;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
+import com.bank.ivr.auth.model.response.AuthenticationResponse;
+import com.bank.ivr.auth.service.AuthenticationOrchestrator;
+import com.bank.ivr.auth.service.BrandAuthConfigurationService;
+import com.bank.ivr.auth.util.LoggingUtil;
+
+import jakarta.validation.Valid;
 
 /**
  * REST controller for IVR authentication operations.
@@ -121,23 +134,26 @@ public class AuthenticationController {
                               brandConfigService.getAvailableBrands());
             }
             
-            var tokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
-
-            var maxAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
-            var concurrentAuthAllowed = brandConfigService.isConcurrentTokenAuthAllowed(brand);
+            List<AuthTokenDefinition> tokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
+            int maxAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
+            boolean concurrentAuthAllowed = brandConfigService.isConcurrentTokenAuthAllowed(brand);
             
-            var response = Map.of(
-                "brand", brand,
-                "tokenDefinitions", tokenDefinitions.stream().map(token -> Map.of(
-                    "name", token.getName(),
-                    "description", token.getDescription(),
-                    "priority", token.getPriority(),
-                    "maxAttempts", token.getMaxAttempts()
-                )).toList(),
-
-                "maxOverallAttempts", maxAttempts,
-                "concurrentAuthAllowed", concurrentAuthAllowed
-            );
+            // Convert token definitions to maps without using streams
+            List<Map<String, Object>> tokenMaps = new ArrayList<>();
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                Map<String, Object> tokenMap = new HashMap<>();
+                tokenMap.put("name", token.getName());
+                tokenMap.put("description", token.getDescription());
+                tokenMap.put("priority", token.getPriority());
+                tokenMap.put("maxAttempts", token.getMaxAttempts());
+                tokenMaps.add(tokenMap);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("brand", brand);
+            response.put("tokenDefinitions", tokenMaps);
+            response.put("maxOverallAttempts", maxAttempts);
+            response.put("concurrentAuthAllowed", concurrentAuthAllowed);
             
             logger.info("Retrieved authentication methods for brand: {} ({} tokens)", brand, tokenDefinitions.size());
             return ResponseEntity.ok(response);
@@ -159,13 +175,15 @@ public class AuthenticationController {
         logger.debug("Getting supported brands");
         
         try {
-            var supportedBrands = brandConfigService.getAvailableBrands();
+            Set<String> supportedBrandsSet = brandConfigService.getAvailableBrands();
+            List<String> supportedBrands = new ArrayList<>(supportedBrandsSet);
             logger.info("Retrieved {} supported brands", supportedBrands.size());
             
-            return ResponseEntity.ok(Map.of(
-                "supportedBrands", supportedBrands,
-                "count", supportedBrands.size()
-            ));
+            Map<String, Object> response = new HashMap<>();
+            response.put("supportedBrands", supportedBrands);
+            response.put("count", supportedBrands.size());
+            
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             logger.error("Error retrieving supported brands", e);
