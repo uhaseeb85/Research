@@ -1,17 +1,19 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.AuthenticationRequest;
-import com.bank.ivr.auth.model.request.ProvidedToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.TokenValidationResult;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
+import com.bank.ivr.auth.model.request.ProvidedToken;
+
 /**
  * Service responsible for processing and validating customer-provided tokens.
- * Now supports brand-aware token validation.
+ * Now supports brand-aware token validation and post-validation rules.
  */
 @Service
 public class TokenProcessingService {
@@ -28,6 +30,7 @@ public class TokenProcessingService {
     /**
      * Processes the tokens provided by the customer using brand-aware validation.
      * Now includes smart tracking of asked tokens vs. provided tokens for intelligent re-asking logic.
+     * Enhanced to support post-validation rules that can trigger additional token requests.
      */
     public void processProvidedTokens(AuthenticationRequest request, AuthenticationContext context, 
                                      CustomerProfile customerProfile) {
@@ -83,6 +86,7 @@ public class TokenProcessingService {
     
     /**
      * Processes each individual token provided by the customer.
+     * Enhanced to support post-validation rules that can trigger additional token requests.
      */
     private void processEachProvidedToken(java.util.List<ProvidedToken> providedTokens, 
                                         AuthenticationContext context, CustomerProfile customerProfile, 
@@ -90,16 +94,18 @@ public class TokenProcessingService {
         String brand = context.getBrand();
         
         for (ProvidedToken providedToken : providedTokens) {
-            boolean isValid = tokenValidationService.validateToken(
+            // Use enhanced validation that includes post-validation rules
+            TokenValidationResult validationResult = tokenValidationService.validateTokenWithPostValidation(
                     providedToken.getTokenName(),
                     brand,
                     context.getCustomerIdentifier().getValue(),
                     providedToken.getTokenValue(),
-                    customerProfile
+                    customerProfile,
+                    context
             );
             
-            if (isValid) {
-                handleSuccessfulValidation(providedToken, context, brand);
+            if (validationResult.isValid()) {
+                handleSuccessfulValidation(providedToken, context, brand, validationResult);
             } else {
                 handleFailedValidation(providedToken, context, lastAskedToken, brand);
             }
@@ -108,11 +114,27 @@ public class TokenProcessingService {
     
     /**
      * Handles successful token validation.
+     * Enhanced to handle post-validation rules that may require additional tokens.
      */
-    private void handleSuccessfulValidation(ProvidedToken providedToken, AuthenticationContext context, String brand) {
+    private void handleSuccessfulValidation(ProvidedToken providedToken, AuthenticationContext context, 
+                                          String brand, TokenValidationResult validationResult) {
         context.addAuthenticatedToken(providedToken.getTokenName());
         logger.debug("Token {} validated successfully for brand '{}' and attempt: {}", 
                    providedToken.getTokenName(), brand, context.getAttemptId());
+        
+        // Check if post-validation rules require additional tokens
+        if (validationResult.requiresAdditionalTokens()) {
+            logger.info("Post-validation rules require additional tokens for token '{}': {} (reason: {})", 
+                       providedToken.getTokenName(), validationResult.getSuggestedAdditionalTokens(), 
+                       validationResult.getReason());
+            
+            // For now, we'll log this information. In a full implementation, you would:
+            // 1. Add fields to AuthenticationContext to store additional token requirements
+            // 2. Modify the response service to check for these requirements
+            // 3. Prioritize suggested additional tokens in the token selection logic
+            logger.debug("Additional tokens suggested: {}, Risk Level: {}", 
+                        validationResult.getSuggestedAdditionalTokens(), validationResult.getRiskLevel());
+        }
     }
     
     /**

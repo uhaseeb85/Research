@@ -9,13 +9,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.TokenValidationResult;
 import com.bank.ivr.auth.validator.TokenValidator;
 
 /**
  * Service for managing token validation operations.
  * Acts as a facade for all token validators and provides efficient lookup.
  * Enforces the rule that there can only be one validator per token per brand.
+ * Enhanced to support post-validation rules that can trigger additional token requests.
  */
 @Service
 public class TokenValidationService {
@@ -23,9 +26,11 @@ public class TokenValidationService {
     private static final Logger logger = LoggerFactory.getLogger(TokenValidationService.class);
     
     private final Map<String, TokenValidator> validatorMap;
+    private final PostValidationRuleService postValidationRuleService;
     
     @Autowired
-    public TokenValidationService(List<TokenValidator> validators) {
+    public TokenValidationService(List<TokenValidator> validators, PostValidationRuleService postValidationRuleService) {
+        this.postValidationRuleService = postValidationRuleService;
         // Create a map for efficient validator lookup by brand+token combination
         this.validatorMap = new HashMap<>();
         
@@ -90,41 +95,83 @@ public class TokenValidationService {
         }
     }
     
-
-    
     /**
-     * Checks if a validator exists for the given brand and token name.
-     * Includes fallback to DEFAULT brand if brand-specific validator not found.
+     * Enhanced validation method that includes post-validation rule evaluation.
+     * This method validates the token and then evaluates post-validation rules to determine
+     * if additional tokens should be requested based on trust levels, phone matching, and
+     * customer profile attributes.
      * 
+     * @param tokenName the name of the token to validate
      * @param brand the brand code
-     * @param tokenName the token name to check
-     * @return true if a validator exists, false otherwise
+     * @param customerIdentifierValue the customer identifier value
+     * @param providedTokenValue the token value provided by the customer
+     * @param customerProfile the customer's profile data
+     * @param context the authentication context including trust level info
+     * @return TokenValidationResult indicating validation success and if additional tokens are needed
      */
-    public boolean hasValidator(String brand, String tokenName) {
-        // First check brand-specific validator
-        if (validatorMap.containsKey(createCompositeKey(brand, tokenName))) {
-            return true;
+    public TokenValidationResult validateTokenWithPostValidation(String tokenName, String brand, 
+                                                               String customerIdentifierValue, 
+                                                               String providedTokenValue, 
+                                                               CustomerProfile customerProfile,
+                                                               AuthenticationContext context) {
+        
+        logger.debug("Validating token '{}' with post-validation rules for brand '{}' and customer '{}'", 
+                    tokenName, brand, customerIdentifierValue);
+        
+        // First perform standard validation
+        boolean isValid = validateToken(tokenName, brand, customerIdentifierValue, providedTokenValue, customerProfile);
+        
+        if (!isValid) {
+            logger.debug("Token '{}' validation failed for brand '{}' and customer '{}'", 
+                        tokenName, brand, customerIdentifierValue);
+            return TokenValidationResult.failure();
         }
         
-        // If not found and brand is not DEFAULT, check DEFAULT brand as fallback
-        if (!"DEFAULT".equals(brand)) {
-            return validatorMap.containsKey(createCompositeKey("DEFAULT", tokenName));
+        // Token is valid, now evaluate post-validation rules
+        try {
+            TokenValidationResult postValidationResult = postValidationRuleService.evaluatePostValidation(
+                    tokenName, context, customerProfile);
+            
+            logger.debug("Post-validation evaluation for token '{}', brand '{}': requiresAdditional={}, reason='{}'",
+                        tokenName, brand, postValidationResult.requiresAdditionalTokens(), 
+                        postValidationResult.getReason());
+            
+            return postValidationResult;
+            
+        } catch (Exception e) {
+            logger.error("Error during post-validation rule evaluation for token '{}', brand '{}', customer '{}': {}", 
+                        tokenName, brand, customerIdentifierValue, e.getMessage(), e);
+            // If post-validation fails, return simple success to not block authentication
+            return TokenValidationResult.success();
         }
-        
-        return false;
     }
     
 
     
     /**
-     * Gets the validator for the given brand and token name.
+     * Checks if a validator exists specifically for the given brand and token name.
+     * Does NOT include fallback to DEFAULT brand.
+     * 
+     * @param brand the brand code
+     * @param tokenName the token name to check
+     * @return true if a validator exists specifically for this brand, false otherwise
+     */
+    public boolean hasValidator(String brand, String tokenName) {
+        return validatorMap.containsKey(createCompositeKey(brand, tokenName));
+    }
+    
+
+    
+    /**
+     * Gets the validator specifically for the given brand and token name.
+     * Does NOT include fallback to DEFAULT brand.
      * 
      * @param brand the brand code
      * @param tokenName the token name
-     * @return the validator, or null if not found
+     * @return the validator for this specific brand, or null if not found
      */
     public TokenValidator getValidator(String brand, String tokenName) {
-        return getValidatorForBrandAndToken(brand, tokenName);
+        return validatorMap.get(createCompositeKey(brand, tokenName));
     }
     
 

@@ -1,20 +1,21 @@
 package com.bank.ivr.auth.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.bank.ivr.auth.rule.impl.FullAuthenticationCompletionRule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Service responsible for building brand-aware authentication responses based on context state.

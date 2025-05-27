@@ -1,28 +1,31 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.AuthenticationRequest;
-import com.bank.ivr.auth.model.request.CustomerIdentifier;
-import com.bank.ivr.auth.model.request.ProvidedToken;
-import com.bank.ivr.auth.model.request.TrustLevelInfo;
-import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.TokenValidationResult;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
+import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.request.ProvidedToken;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
+import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 
 @ExtendWith(MockitoExtension.class)
 class TokenProcessingServiceTest {
@@ -95,8 +98,9 @@ class TokenProcessingServiceTest {
                 request.getTrustLevelInfo()
         );
 
-        when(tokenValidationService.validateToken(eq("DEBIT_CARD_PIN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("1234"), eq(customerProfile))).thenReturn(true);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("DEBIT_CARD_PIN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("1234"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.success());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);
@@ -123,8 +127,9 @@ class TokenProcessingServiceTest {
                 request.getTrustLevelInfo()
         );
 
-        when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("wrongssn"), eq(customerProfile))).thenReturn(false);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("wrongssn"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.failure());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);
@@ -152,8 +157,9 @@ class TokenProcessingServiceTest {
                 request.getTrustLevelInfo()
         );
 
-        when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("123456789"), eq(customerProfile))).thenReturn(true);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("123456789"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.success());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);
@@ -181,8 +187,9 @@ class TokenProcessingServiceTest {
         );
 
         // Mock that validation succeeds (SSN validator should handle flexible input)
-        when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("123456789"), eq(customerProfile))).thenReturn(true);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("123456789"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.success());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);
@@ -267,8 +274,9 @@ class TokenProcessingServiceTest {
                 request.getTrustLevelInfo()
         );
 
-        when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("wrongssn"), eq(customerProfile))).thenReturn(false);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("wrongssn"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.failure());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);
@@ -301,8 +309,9 @@ class TokenProcessingServiceTest {
                 request.getTrustLevelInfo()
         );
 
-        when(tokenValidationService.validateToken(eq("SSN"), eq("TEST_BRAND"), 
-                eq("1234567890"), eq("wrongssn"), eq(customerProfile))).thenReturn(false);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
+                eq("1234567890"), eq("wrongssn"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.failure());
 
         // Act
         tokenProcessingService.processProvidedTokens(request, context, customerProfile);

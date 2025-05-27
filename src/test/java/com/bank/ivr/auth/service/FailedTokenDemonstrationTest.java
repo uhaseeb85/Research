@@ -1,32 +1,37 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.AuthenticationRequest;
-import com.bank.ivr.auth.model.request.CustomerIdentifier;
-import com.bank.ivr.auth.model.request.ProvidedToken;
-import com.bank.ivr.auth.model.request.TrustLevelInfo;
-import com.bank.ivr.auth.model.response.AuthenticationResponse;
-import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.TokenValidationResult;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
+import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.request.ProvidedToken;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
+import com.bank.ivr.auth.model.response.AuthenticationResponse;
+import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 
 /**
  * Comprehensive demonstration of failed token handling throughout the authentication flow.
@@ -143,8 +148,9 @@ class FailedTokenDemonstrationTest {
                 createDefaultTrustLevelInfo()
         );
         
-        when(tokenValidationService.validateToken(eq("SSN"), eq("DEMO_BANK"), 
-                eq("555-1234"), eq("wrong-ssn-1"), eq(customerProfile))).thenReturn(false);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("DEMO_BANK"), 
+                eq("555-1234"), eq("wrong-ssn-1"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.failure());
         
         tokenProcessingService.processProvidedTokens(request1, context, customerProfile);
         
@@ -173,8 +179,9 @@ class FailedTokenDemonstrationTest {
                 createDefaultTrustLevelInfo()
         );
         
-        when(tokenValidationService.validateToken(eq("SSN"), eq("DEMO_BANK"), 
-                eq("555-1234"), eq("wrong-ssn-2"), eq(customerProfile))).thenReturn(false);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("DEMO_BANK"), 
+                eq("555-1234"), eq("wrong-ssn-2"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.failure());
         
         tokenProcessingService.processProvidedTokens(request2, context, customerProfile);
         
@@ -208,8 +215,9 @@ class FailedTokenDemonstrationTest {
                 createDefaultTrustLevelInfo()
         );
         
-        when(tokenValidationService.validateToken(eq("DEBIT_CARD_PIN"), eq("DEMO_BANK"), 
-                eq("555-1234"), eq("1234"), eq(customerProfile))).thenReturn(true);
+        when(tokenValidationService.validateTokenWithPostValidation(eq("DEBIT_CARD_PIN"), eq("DEMO_BANK"), 
+                eq("555-1234"), eq("1234"), eq(customerProfile), eq(context)))
+                .thenReturn(TokenValidationResult.success());
         
         tokenProcessingService.processProvidedTokens(request3, context, customerProfile);
         

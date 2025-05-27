@@ -1,27 +1,35 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.CustomerIdentifier;
-import com.bank.ivr.auth.model.response.AuthenticationResponse;
-import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.lenient;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.response.AuthenticationResponse;
+import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthenticationResponseService Tests")
