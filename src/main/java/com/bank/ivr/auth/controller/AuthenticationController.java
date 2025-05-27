@@ -138,7 +138,6 @@ public class AuthenticationController {
             int maxAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
             boolean concurrentAuthAllowed = brandConfigService.isConcurrentTokenAuthAllowed(brand);
             
-            // Convert token definitions to maps without using streams
             List<Map<String, Object>> tokenMaps = new ArrayList<>();
             for (AuthTokenDefinition token : tokenDefinitions) {
                 Map<String, Object> tokenMap = new HashMap<>();
