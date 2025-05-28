@@ -1,0 +1,20 @@
+{
+  "sessionId": "session-12345",
+  "customerIdentifier": {
+    "type": "PHONE_NUMBER",
+    "value": "+1234567890"
+  },
+  "attemptId": "attempt-uuid-from-previous-response",
+  "providedTokens": [
+    {
+      "tokenName": "DEBIT_CARD_PIN",
+      "tokenValue": "1234"
+    }
+  ],
+  "brand": "PREMIUM_BANK",
+  "trustLevelInfo": {
+    "trustLevel": "GREEN",
+    "phoneMatchStatus": "SINGLE_MATCH",
+    "matchedSsnCount": 1
+  }
+} 

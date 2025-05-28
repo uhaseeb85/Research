@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
 import com.bank.ivr.auth.service.DnisConfigurationService;
+import com.bank.ivr.auth.service.SessionContextService;
 import com.bank.ivr.auth.util.LoggingUtil;
 
 import jakarta.validation.Valid;
@@ -33,7 +35,7 @@ import jakarta.validation.Valid;
 /**
  * REST controller for IVR authentication operations.
  * Handles brand-aware authentication endpoint for customer verification.
- * Now includes DNIS configuration support.
+ * Now includes DNIS configuration support and session context integration.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -45,23 +47,27 @@ public class AuthenticationController {
     private final AuthenticationOrchestrator authenticationOrchestrator;
     private final BrandAuthConfigurationService brandConfigService;
     private final DnisConfigurationService dnisConfigService;
+    private final SessionContextService sessionContextService;
     
     @Autowired
     public AuthenticationController(AuthenticationOrchestrator authenticationOrchestrator,
                                    BrandAuthConfigurationService brandConfigService,
-                                   DnisConfigurationService dnisConfigService) {
+                                   DnisConfigurationService dnisConfigService,
+                                   SessionContextService sessionContextService) {
         this.authenticationOrchestrator = authenticationOrchestrator;
         this.brandConfigService = brandConfigService;
         this.dnisConfigService = dnisConfigService;
-        logger.info("AUTH_CONTROLLER_INITIALIZED - Brand-aware AuthenticationController with DNIS support started successfully");
+        this.sessionContextService = sessionContextService;
+        logger.info("AUTH_CONTROLLER_INITIALIZED - Brand-aware AuthenticationController with DNIS support and session context started successfully");
     }
     
     /**
      * Main authentication endpoint for IVR customers.
      * Handles both new authentication attempts and continuation of existing attempts.
      * Now supports brand-specific authentication rules, token priorities, and DNIS configurations.
+     * DNIS and sessionSsn are retrieved from session context instead of request body.
      * 
-     * @param request the authentication request containing customer identifier, tokens, brand, and DNIS
+     * @param request the authentication request containing customer identifier, tokens, and brand
      * @return authentication response with next steps or final result
      */
     @PostMapping("/customer")
@@ -70,16 +76,31 @@ public class AuthenticationController {
         String sessionId = request.getSessionId();
         String attemptId = request.getAttemptId();
         String brand = request.getBrand();
-        String dnis = request.getDnis();
         
         try {
             LoggingUtil.logAuthStart(logger, sessionId, brand, request.getCustomerIdentifier().toString());
             
-            // Log DNIS information if provided
-            if (request.hasDnis()) {
-                logger.info("DNIS provided in request: {} for session: {}", dnis, sessionId);
+            // Retrieve DNIS from session context
+            Optional<String> dnisOpt = sessionContextService.getDnisFromSession(sessionId);
+            String dnis = dnisOpt.orElse(null);
+            
+            // Retrieve session SSN list from session context
+            Optional<List<String>> sessionSsnListOpt = sessionContextService.getSessionSsnFromSession(sessionId);
+            List<String> sessionSsnList = sessionSsnListOpt.orElse(null);
+            
+            // Log context information
+            if (dnis != null) {
+                logger.info("DNIS retrieved from session context: {} for session: {}", dnis, sessionId);
                 DnisConfiguration dnisConfig = dnisConfigService.getDnisConfiguration(dnis);
                 logger.info("Using DNIS configuration: {} - {}", dnisConfig.getDnis(), dnisConfig.getDescription());
+            } else {
+                logger.debug("No DNIS found in session context for session: {}", sessionId);
+            }
+            
+            if (sessionSsnList != null && !sessionSsnList.isEmpty()) {
+                logger.info("Session SSN list retrieved from context for session: {} (count: {})", sessionId, sessionSsnList.size());
+            } else {
+                logger.debug("No session SSN found in context for session: {}", sessionId);
             }
         
             // Validate brand support
@@ -95,7 +116,8 @@ public class AuthenticationController {
                 return ResponseEntity.badRequest().body(errorResponse);
             }
         
-            AuthenticationResponse response = authenticationOrchestrator.authenticateCustomer(request);
+            // Pass the context information to the orchestrator
+            AuthenticationResponse response = authenticationOrchestrator.authenticateCustomer(request, dnis, sessionSsnList);
             long processingTime = System.currentTimeMillis() - startTime;
             
             LoggingUtil.logAuthComplete(logger, sessionId, brand, response.getStatus().toString(), processingTime);
@@ -103,8 +125,8 @@ public class AuthenticationController {
             return ResponseEntity.ok(response);
             
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid authentication request - SessionId: {}, Brand: {}, DNIS: {}, Error: {}", 
-                       sessionId, brand, dnis, e.getMessage());
+            logger.warn("Invalid authentication request - SessionId: {}, Brand: {}, Error: {}", 
+                       sessionId, brand, e.getMessage());
             
             String brandMessage = brandConfigService.getBrandMessage(brand, "failure");
             AuthenticationResponse errorResponse = AuthenticationResponse.builder()
@@ -116,7 +138,7 @@ public class AuthenticationController {
             return ResponseEntity.badRequest().body(errorResponse);
             
         } catch (Exception e) {
-            logger.error("Authentication error - SessionId: {}, Brand: {}, DNIS: {}", sessionId, brand, dnis, e);
+            logger.error("Authentication error - SessionId: {}, Brand: {}", sessionId, brand, e);
             
             String brandMessage = brandConfigService.getBrandMessage(brand, "failure");
             AuthenticationResponse errorResponse = AuthenticationResponse.builder()

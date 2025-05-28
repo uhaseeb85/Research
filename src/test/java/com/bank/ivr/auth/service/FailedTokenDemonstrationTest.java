@@ -145,9 +145,7 @@ class FailedTokenDemonstrationTest {
                 "demo-attempt-123",
                 List.of(new ProvidedToken("SSN", "wrong-ssn-1")),
                 "DEMO_BANK",
-                createDefaultTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("DEMO_BANK"), 
@@ -178,9 +176,7 @@ class FailedTokenDemonstrationTest {
                 "demo-attempt-123",
                 List.of(new ProvidedToken("SSN", "wrong-ssn-2")), // User provides SSN instead of PIN
                 "DEMO_BANK",
-                createDefaultTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("DEMO_BANK"), 
@@ -216,9 +212,7 @@ class FailedTokenDemonstrationTest {
                 "demo-attempt-123",
                 List.of(new ProvidedToken("DEBIT_CARD_PIN", "1234")),
                 "DEMO_BANK",
-                createDefaultTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                createDefaultTrustLevelInfo()
         );
         
         when(tokenValidationService.validateTokenWithPostValidation(eq("DEBIT_CARD_PIN"), eq("DEMO_BANK"), 

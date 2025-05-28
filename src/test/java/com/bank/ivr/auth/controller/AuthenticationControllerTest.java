@@ -3,6 +3,7 @@ package com.bank.ivr.auth.controller;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
@@ -41,6 +42,7 @@ import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
 import com.bank.ivr.auth.service.DnisConfigurationService;
+import com.bank.ivr.auth.service.SessionContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebMvcTest(AuthenticationController.class)
@@ -58,6 +60,9 @@ class AuthenticationControllerTest {
     
     @MockBean
     private DnisConfigurationService dnisConfigService;
+
+    @MockBean
+    private SessionContextService sessionContextService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -79,9 +84,7 @@ class AuthenticationControllerTest {
                 null, // New attempt
                 Collections.emptyList(),
                 "PREMIUM_BANK",
-                createDefaultTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                createDefaultTrustLevelInfo()
         );
         
         communityBankRequest = new AuthenticationRequest(
@@ -90,9 +93,7 @@ class AuthenticationControllerTest {
                 null, // New attempt
                 Collections.emptyList(),
                 "COMMUNITY_BANK",
-                createDefaultTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                createDefaultTrustLevelInfo()
         );
 
         // Setup default brand configuration service mocks
@@ -111,6 +112,10 @@ class AuthenticationControllerTest {
         when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
         
         when(brandConfigService.getBrandMessage(any(), eq("failure"))).thenReturn("Authentication failed. Please try again or contact support.");
+        
+        // Setup default session context service mocks
+        when(sessionContextService.getDnisFromSession(any())).thenReturn(Optional.empty());
+        when(sessionContextService.getSessionSsnFromSession(any())).thenReturn(Optional.empty());
     }
     
     private TrustLevelInfo createDefaultTrustLevelInfo() {
@@ -129,7 +134,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should reject unsupported brand")
         void shouldRejectUnsupportedBrand() throws Exception {
             // Given
-            AuthenticationRequest unsupportedBrandRequest = new AuthenticationRequest("session-789", customerIdentifier, null, Collections.emptyList(), "UNSUPPORTED_BRAND", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest unsupportedBrandRequest = new AuthenticationRequest("session-789", customerIdentifier, null, Collections.emptyList(), "UNSUPPORTED_BRAND", createDefaultTrustLevelInfo());
 
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
@@ -140,7 +145,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("FAILED")))
                     .andExpect(jsonPath("$.message", containsString("Brand 'UNSUPPORTED_BRAND' is not supported")));
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -160,7 +165,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -173,7 +178,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -185,7 +190,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
 
             verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
-            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class), any(), any());
         }
     }
 
@@ -203,7 +208,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -216,7 +221,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
                     .andExpect(jsonPath("$.message", containsString("PIN")));
 
-            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class), any(), any());
         }
 
         @Test
@@ -227,7 +232,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("DEBIT_CARD_PIN", "1234")
             );
             
-            AuthenticationRequest continuingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest continuingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -237,7 +242,7 @@ class AuthenticationControllerTest {
 
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -260,7 +265,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("DATE_OF_BIRTH", "01/01/1990")
             );
             
-            AuthenticationRequest completingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest completingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -269,7 +274,7 @@ class AuthenticationControllerTest {
                     .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -298,7 +303,7 @@ class AuthenticationControllerTest {
                     .message("Please provide the last 4 digits of your Social Security Number.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -320,7 +325,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("SSN", "123456789")
             );
             
-            AuthenticationRequest completingRequest = new AuthenticationRequest("session-456", customerIdentifier, "attempt-456", tokens, "COMMUNITY_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest completingRequest = new AuthenticationRequest("session-456", customerIdentifier, "attempt-456", tokens, "COMMUNITY_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-456")
@@ -329,7 +334,7 @@ class AuthenticationControllerTest {
                     .authenticatedTokens(Arrays.asList("SSN"))
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -487,7 +492,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle IllegalArgumentException with brand context")
         void shouldHandleIllegalArgumentExceptionWithBrandContext() throws Exception {
             // Given
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenThrow(new IllegalArgumentException("Invalid token format"));
 
             when(brandConfigService.getBrandMessage("PREMIUM_BANK", "failure"))
@@ -509,7 +514,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle unexpected exceptions with brand context")
         void shouldHandleUnexpectedExceptionsWithBrandContext() throws Exception {
             // Given
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenThrow(new RuntimeException("Database connection failed"));
 
             when(brandConfigService.getBrandMessage("COMMUNITY_BANK", "failure"))
@@ -541,7 +546,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -573,7 +578,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -585,7 +590,7 @@ class AuthenticationControllerTest {
                     "ACC123456789"
             );
             
-            AuthenticationRequest accountRequest = new AuthenticationRequest("session-789", accountIdentifier, null, Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest accountRequest = new AuthenticationRequest("session-789", accountIdentifier, null, Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-789")
@@ -593,7 +598,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -653,7 +658,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle empty token list with brand context")
         void shouldHandleEmptyTokenListWithBrandContext() throws Exception {
             // Given
-            AuthenticationRequest emptyTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest emptyTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -661,7 +666,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -681,7 +686,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("INVALID_TOKEN", "invalid_value")
             );
             
-            AuthenticationRequest invalidTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", invalidTokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
+            AuthenticationRequest invalidTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", invalidTokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -689,7 +694,7 @@ class AuthenticationControllerTest {
                     .message("Invalid token type for Premium Bank")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then

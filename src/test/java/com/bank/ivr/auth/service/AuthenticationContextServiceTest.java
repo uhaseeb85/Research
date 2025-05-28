@@ -70,9 +70,7 @@ class AuthenticationContextServiceTest {
                 null,
                 null,
                 "TEST_BANK",
-                trustLevelInfo,
-                null, // dnis
-                null  // sessionSsn
+                trustLevelInfo
         );
 
         // Set up customer profile
@@ -373,9 +371,7 @@ class AuthenticationContextServiceTest {
                 null,
                 null,
                 "PREMIUM_BANK",
-                request.getTrustLevelInfo(),
-                null, // dnis
-                null  // sessionSsn
+                request.getTrustLevelInfo()
         );
 
         String attemptId = "attempt-premium";
