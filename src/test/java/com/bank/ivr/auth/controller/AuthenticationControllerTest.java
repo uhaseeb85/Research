@@ -1,34 +1,47 @@
 package com.bank.ivr.auth.controller;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
 import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
+import com.bank.ivr.auth.service.DnisConfigurationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.*;
-
-import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthenticationController.class)
 @DisplayName("Brand-Aware Authentication Controller Tests")
@@ -42,6 +55,9 @@ class AuthenticationControllerTest {
     
     @MockBean
     private BrandAuthConfigurationService brandConfigService;
+    
+    @MockBean
+    private DnisConfigurationService dnisConfigService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -63,7 +79,9 @@ class AuthenticationControllerTest {
                 null, // New attempt
                 Collections.emptyList(),
                 "PREMIUM_BANK",
-                createDefaultTrustLevelInfo()
+                createDefaultTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
         
         communityBankRequest = new AuthenticationRequest(
@@ -72,7 +90,9 @@ class AuthenticationControllerTest {
                 null, // New attempt
                 Collections.emptyList(),
                 "COMMUNITY_BANK",
-                createDefaultTrustLevelInfo()
+                createDefaultTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         // Setup default brand configuration service mocks
@@ -109,7 +129,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should reject unsupported brand")
         void shouldRejectUnsupportedBrand() throws Exception {
             // Given
-            AuthenticationRequest unsupportedBrandRequest = new AuthenticationRequest("session-789", customerIdentifier, null, Collections.emptyList(), "UNSUPPORTED_BRAND", createDefaultTrustLevelInfo());
+            AuthenticationRequest unsupportedBrandRequest = new AuthenticationRequest("session-789", customerIdentifier, null, Collections.emptyList(), "UNSUPPORTED_BRAND", createDefaultTrustLevelInfo(), null, null);
 
             // When & Then
             mockMvc.perform(post("/api/v1/auth/customer")
@@ -207,7 +227,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("DEBIT_CARD_PIN", "1234")
             );
             
-            AuthenticationRequest continuingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest continuingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -240,7 +260,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("DATE_OF_BIRTH", "01/01/1990")
             );
             
-            AuthenticationRequest completingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest completingRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", tokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -300,7 +320,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("SSN", "123456789")
             );
             
-            AuthenticationRequest completingRequest = new AuthenticationRequest("session-456", customerIdentifier, "attempt-456", tokens, "COMMUNITY_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest completingRequest = new AuthenticationRequest("session-456", customerIdentifier, "attempt-456", tokens, "COMMUNITY_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-456")
@@ -565,7 +585,7 @@ class AuthenticationControllerTest {
                     "ACC123456789"
             );
             
-            AuthenticationRequest accountRequest = new AuthenticationRequest("session-789", accountIdentifier, null, Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest accountRequest = new AuthenticationRequest("session-789", accountIdentifier, null, Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-789")
@@ -596,7 +616,7 @@ class AuthenticationControllerTest {
             mockMvc.perform(get("/api/v1/auth/health"))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(content().string("IVR Authentication Service is healthy (Brand-aware)"));
+                    .andExpect(content().string("IVR Authentication Service is healthy (Brand-aware with DNIS support)"));
         }
 
         @Test
@@ -633,7 +653,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle empty token list with brand context")
         void shouldHandleEmptyTokenListWithBrandContext() throws Exception {
             // Given
-            AuthenticationRequest emptyTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest emptyTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", Collections.emptyList(), "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")
@@ -661,7 +681,7 @@ class AuthenticationControllerTest {
                     new ProvidedToken("INVALID_TOKEN", "invalid_value")
             );
             
-            AuthenticationRequest invalidTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", invalidTokens, "PREMIUM_BANK", createDefaultTrustLevelInfo());
+            AuthenticationRequest invalidTokenRequest = new AuthenticationRequest("session-123", customerIdentifier, "attempt-123", invalidTokens, "PREMIUM_BANK", createDefaultTrustLevelInfo(), null, null);
 
             AuthenticationResponse mockResponse = AuthenticationResponse.builder()
                     .attemptId("attempt-123")

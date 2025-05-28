@@ -70,7 +70,9 @@ class TokenProcessingServiceTest {
                 "test-attempt-123",
                 null, // will be set per test
                 "TEST_BRAND",
-                createDefaultTrustLevelInfo()
+                createDefaultTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
     }
     
@@ -95,7 +97,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(pinToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         when(tokenValidationService.validateTokenWithPostValidation(eq("DEBIT_CARD_PIN"), eq("TEST_BRAND"), 
@@ -124,7 +128,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(ssnToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
@@ -154,7 +160,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(ssnToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
@@ -183,7 +191,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(ssnToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         // Mock that validation succeeds (SSN validator should handle flexible input)
@@ -211,7 +221,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 null,
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         // Act
@@ -271,7 +283,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(ssnToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 
@@ -306,7 +320,9 @@ class TokenProcessingServiceTest {
                 request.getAttemptId(),
                 List.of(ssnToken),
                 request.getBrand(),
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         when(tokenValidationService.validateTokenWithPostValidation(eq("SSN"), eq("TEST_BRAND"), 

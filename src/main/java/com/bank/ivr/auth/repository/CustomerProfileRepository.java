@@ -1,9 +1,9 @@
 package com.bank.ivr.auth.repository;
 
+import java.util.Optional;
+
 import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
-
-import java.util.Optional;
 
 /**
  * Repository interface for CustomerProfile entity.
@@ -34,6 +34,14 @@ public interface CustomerProfileRepository {
      * @return an Optional containing the customer profile if found
      */
     Optional<CustomerProfile> findByAccountNumber(String accountNumber);
+    
+    /**
+     * Finds a customer by their SSN.
+     * 
+     * @param ssn the Social Security Number
+     * @return an Optional containing the customer profile if found
+     */
+    Optional<CustomerProfile> findBySsn(String ssn);
     
     /**
      * Finds a customer by the provided identifier based on the identifier type.
@@ -67,6 +75,14 @@ public interface CustomerProfileRepository {
      * @return true if the customer exists, false otherwise
      */
     boolean existsByAccountNumber(String accountNumber);
+    
+    /**
+     * Checks if a customer exists by their SSN.
+     * 
+     * @param ssn the Social Security Number
+     * @return true if the customer exists, false otherwise
+     */
+    boolean existsBySsn(String ssn);
     
     /**
      * Finds a customer using the CustomerIdentifier object.

@@ -20,10 +20,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.DnisConfiguration;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
+import com.bank.ivr.auth.service.DnisConfigurationService;
 import com.bank.ivr.auth.util.LoggingUtil;
 
 import jakarta.validation.Valid;
@@ -31,6 +33,7 @@ import jakarta.validation.Valid;
 /**
  * REST controller for IVR authentication operations.
  * Handles brand-aware authentication endpoint for customer verification.
+ * Now includes DNIS configuration support.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -41,21 +44,24 @@ public class AuthenticationController {
     
     private final AuthenticationOrchestrator authenticationOrchestrator;
     private final BrandAuthConfigurationService brandConfigService;
+    private final DnisConfigurationService dnisConfigService;
     
     @Autowired
     public AuthenticationController(AuthenticationOrchestrator authenticationOrchestrator,
-                                   BrandAuthConfigurationService brandConfigService) {
+                                   BrandAuthConfigurationService brandConfigService,
+                                   DnisConfigurationService dnisConfigService) {
         this.authenticationOrchestrator = authenticationOrchestrator;
         this.brandConfigService = brandConfigService;
-        logger.info("AUTH_CONTROLLER_INITIALIZED - Brand-aware AuthenticationController started successfully");
+        this.dnisConfigService = dnisConfigService;
+        logger.info("AUTH_CONTROLLER_INITIALIZED - Brand-aware AuthenticationController with DNIS support started successfully");
     }
     
     /**
      * Main authentication endpoint for IVR customers.
      * Handles both new authentication attempts and continuation of existing attempts.
-     * Now supports brand-specific authentication rules and token priorities.
+     * Now supports brand-specific authentication rules, token priorities, and DNIS configurations.
      * 
-     * @param request the authentication request containing customer identifier, tokens, and brand
+     * @param request the authentication request containing customer identifier, tokens, brand, and DNIS
      * @return authentication response with next steps or final result
      */
     @PostMapping("/customer")
@@ -64,9 +70,17 @@ public class AuthenticationController {
         String sessionId = request.getSessionId();
         String attemptId = request.getAttemptId();
         String brand = request.getBrand();
+        String dnis = request.getDnis();
         
         try {
             LoggingUtil.logAuthStart(logger, sessionId, brand, request.getCustomerIdentifier().toString());
+            
+            // Log DNIS information if provided
+            if (request.hasDnis()) {
+                logger.info("DNIS provided in request: {} for session: {}", dnis, sessionId);
+                DnisConfiguration dnisConfig = dnisConfigService.getDnisConfiguration(dnis);
+                logger.info("Using DNIS configuration: {} - {}", dnisConfig.getDnis(), dnisConfig.getDescription());
+            }
         
             // Validate brand support
             if (!brandConfigService.isBrandSupported(brand)) {
@@ -89,8 +103,8 @@ public class AuthenticationController {
             return ResponseEntity.ok(response);
             
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid authentication request - SessionId: {}, Brand: {}, Error: {}", 
-                       sessionId, brand, e.getMessage());
+            logger.warn("Invalid authentication request - SessionId: {}, Brand: {}, DNIS: {}, Error: {}", 
+                       sessionId, brand, dnis, e.getMessage());
             
             String brandMessage = brandConfigService.getBrandMessage(brand, "failure");
             AuthenticationResponse errorResponse = AuthenticationResponse.builder()
@@ -102,7 +116,7 @@ public class AuthenticationController {
             return ResponseEntity.badRequest().body(errorResponse);
             
         } catch (Exception e) {
-            logger.error("Authentication error - SessionId: {}, Brand: {}", sessionId, brand, e);
+            logger.error("Authentication error - SessionId: {}, Brand: {}, DNIS: {}", sessionId, brand, dnis, e);
             
             String brandMessage = brandConfigService.getBrandMessage(brand, "failure");
             AuthenticationResponse errorResponse = AuthenticationResponse.builder()
@@ -112,6 +126,87 @@ public class AuthenticationController {
                     .build();
             
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Get DNIS configuration endpoint.
+     * Returns the configuration for a specific DNIS number.
+     * 
+     * @param dnis the DNIS number
+     * @return DNIS configuration
+     */
+    @GetMapping("/dnis/{dnis}")
+    public ResponseEntity<Object> getDnisConfiguration(@PathVariable String dnis) {
+        logger.debug("Getting DNIS configuration for: {}", dnis);
+        
+        try {
+            DnisConfiguration config = dnisConfigService.getDnisConfiguration(dnis);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("dnis", config.getDnis());
+            response.put("description", config.getDescription());
+            response.put("allowSsnAuthentication", config.isAllowSsnAuthentication());
+            response.put("allowPinAuthentication", config.isAllowPinAuthentication());
+            response.put("allowDateOfBirthAuthentication", config.isAllowDateOfBirthAuthentication());
+            response.put("allowMotherMaidenNameAuthentication", config.isAllowMotherMaidenNameAuthentication());
+            response.put("allowAccountNumberAuthentication", config.isAllowAccountNumberAuthentication());
+            response.put("requireMultiFactorAuth", config.isRequireMultiFactorAuth());
+            response.put("allowTrustLevelBypass", config.isAllowTrustLevelBypass());
+            response.put("enablePhoneMatchValidation", config.isEnablePhoneMatchValidation());
+            response.put("allowAlternativeTokens", config.isAllowAlternativeTokens());
+            response.put("enableStrictValidation", config.isEnableStrictValidation());
+            response.put("allowRetryOnFailure", config.isAllowRetryOnFailure());
+            response.put("enableAuditLogging", config.isEnableAuditLogging());
+            response.put("maxAuthenticationAttempts", config.getMaxAuthenticationAttempts());
+            response.put("sessionTimeoutMinutes", config.getSessionTimeoutMinutes());
+            
+            logger.info("Retrieved DNIS configuration for: {} - {}", config.getDnis(), config.getDescription());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving DNIS configuration for: {}", dnis, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to retrieve DNIS configuration for '" + dnis + "': " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get all DNIS configurations endpoint.
+     * 
+     * @return list of all DNIS configurations
+     */
+    @GetMapping("/dnis")
+    public ResponseEntity<Object> getAllDnisConfigurations() {
+        logger.debug("Getting all DNIS configurations");
+        
+        try {
+            Map<String, DnisConfiguration> allConfigs = dnisConfigService.getAllDnisConfigurations();
+            List<Map<String, Object>> configList = new ArrayList<>();
+            
+            for (DnisConfiguration config : allConfigs.values()) {
+                Map<String, Object> configMap = new HashMap<>();
+                configMap.put("dnis", config.getDnis());
+                configMap.put("description", config.getDescription());
+                configMap.put("allowSsnAuthentication", config.isAllowSsnAuthentication());
+                configMap.put("allowPinAuthentication", config.isAllowPinAuthentication());
+                configMap.put("requireMultiFactorAuth", config.isRequireMultiFactorAuth());
+                configMap.put("maxAuthenticationAttempts", config.getMaxAuthenticationAttempts());
+                configMap.put("sessionTimeoutMinutes", config.getSessionTimeoutMinutes());
+                configList.add(configMap);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("dnisConfigurations", configList);
+            response.put("count", configList.size());
+            
+            logger.info("Retrieved {} DNIS configurations", configList.size());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving all DNIS configurations", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to retrieve DNIS configurations: " + e.getMessage());
         }
     }
     
@@ -199,7 +294,7 @@ public class AuthenticationController {
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         try {
-            return ResponseEntity.ok("IVR Authentication Service is healthy (Brand-aware)");
+            return ResponseEntity.ok("IVR Authentication Service is healthy (Brand-aware with DNIS support)");
         } catch (Exception e) {
             logger.error("Health check failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -1,12 +1,13 @@
 package com.bank.ivr.auth.model.request;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-
-import java.util.List;
 
 public class AuthenticationRequest {
     
@@ -28,6 +29,12 @@ public class AuthenticationRequest {
     @Valid
     private final TrustLevelInfo trustLevelInfo;
     
+    // New field for DNIS support
+    private final String dnis;
+    
+    // New field for SSN from session (from previous API call)
+    private final String sessionSsn;
+    
     @JsonCreator
     public AuthenticationRequest(
             @JsonProperty("sessionId") String sessionId,
@@ -35,13 +42,17 @@ public class AuthenticationRequest {
             @JsonProperty("attemptId") String attemptId,
             @JsonProperty("providedTokens") List<ProvidedToken> providedTokens,
             @JsonProperty("brand") String brand,
-            @JsonProperty("trustLevelInfo") TrustLevelInfo trustLevelInfo) {
+            @JsonProperty("trustLevelInfo") TrustLevelInfo trustLevelInfo,
+            @JsonProperty("dnis") String dnis,
+            @JsonProperty("sessionSsn") String sessionSsn) {
         this.sessionId = sessionId;
         this.customerIdentifier = customerIdentifier;
         this.attemptId = attemptId;
         this.providedTokens = providedTokens;
         this.brand = brand;
         this.trustLevelInfo = trustLevelInfo;
+        this.dnis = dnis;
+        this.sessionSsn = sessionSsn;
     }
     
     public String getSessionId() {
@@ -68,8 +79,24 @@ public class AuthenticationRequest {
         return trustLevelInfo;
     }
     
+    public String getDnis() {
+        return dnis;
+    }
+    
+    public String getSessionSsn() {
+        return sessionSsn;
+    }
+    
     public boolean isNewAttempt() {
         return attemptId == null || attemptId.trim().isEmpty();
+    }
+    
+    public boolean hasDnis() {
+        return dnis != null && !dnis.trim().isEmpty();
+    }
+    
+    public boolean hasSessionSsn() {
+        return sessionSsn != null && !sessionSsn.trim().isEmpty();
     }
     
     @Override
@@ -81,6 +108,8 @@ public class AuthenticationRequest {
                ", providedTokens=" + providedTokens +
                ", brand='" + brand + '\'' +
                ", trustLevelInfo=" + trustLevelInfo +
+               ", dnis='" + dnis + '\'' +
+               ", sessionSsn='" + (sessionSsn != null ? "***MASKED***" : null) + '\'' +
                '}';
     }
 } 

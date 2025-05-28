@@ -1,0 +1,16 @@
+{
+  "sessionId": "session-67890",
+  "customerIdentifier": {
+    "type": "PHONE_NUMBER",
+    "value": "+1987654321"
+  },
+  "attemptId": null,
+  "providedTokens": [],
+  "brand": "PREMIUM_BANK",
+  "trustLevelInfo": {
+    "trustLevel": "RED",
+    "phoneMatchStatus": "NOT_MATCHED",
+    "matchedSsnCount": 0
+  },
+  "dnis": "18009876543"
+} 

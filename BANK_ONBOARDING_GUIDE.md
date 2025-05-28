@@ -1,19 +1,34 @@
 # Bank Onboarding Guide - IVR Authentication System
 
-This comprehensive guide walks you through the process of adding a new bank (brand) to the IVR Authentication System, including implementing custom authentication tokens and validation rules.
+This comprehensive guide walks you through the process of adding a new bank (brand) to the IVR Authentication System, including implementing custom authentication tokens, DNIS configurations, and validation rules.
 
-## 🆕 Latest Updates (v1.3)
+## 🆕 Latest Updates (v2.0) - Major Release
 
-This guide reflects the most recent system improvements:
-- **🔥 NEW: Trust-Based Authentication**: Advanced conditional authentication based on trust levels and phone matching
-- **Royal Bank Implementation**: Complete example of trust-based authentication with hundreds of conditional scenarios
-- **Enhanced Request Model**: `AuthenticationRequest` now includes `TrustLevelInfo` for advanced authentication flows
-- **Conditional Rules**: New `ConditionalAuthenticationRule` interface for complex authentication logic
-- **Codebase Cleanup**: Removed deprecated methods and simplified APIs
-- **Enhanced Error Handling**: Streamlined controller logging and error responses
-- **Improved Code Quality**: Fixed compilation issues and updated test expectations
+This guide reflects the most recent system improvements and major enhancements:
 
-📋 **For detailed information about all improvements, see [CODEBASE_CLEANUP_SUMMARY.md](CODEBASE_CLEANUP_SUMMARY.md)**
+### 🚀 Core New Features
+- **🔥 NEW: DNIS Support**: Phone number-based routing with configurable authentication rules per DNIS
+- **🔥 NEW: Brand-Aware Authentication**: Complete multi-brand support with distinct authentication flows
+- **🔥 NEW: Advanced Retry Management**: Progressive lockout, cross-token delays, and suspicious activity detection
+- **🔥 NEW: Trust Level Integration**: Enhanced phone match validation and risk-based authentication
+- **🔥 NEW: Failed Token Tracking**: Smart re-asking logic prevents repeated requests for failed tokens
+- **🔥 NEW: Post-Validation Rules**: Additional security checks after successful token validation
+
+### 🛡️ Security & Enterprise Features
+- **Enhanced Security**: Progressive lockout with escalating security measures
+- **Comprehensive Test Suite**: 170+ tests ensuring reliability and correctness
+- **Production Ready**: Health checks, monitoring, and operational excellence
+- **PII Protection**: Secure handling and masking of sensitive customer information
+
+### 🏗️ Architecture Improvements
+- **Enhanced Request Model**: `AuthenticationRequest` now includes `dnis`, `sessionSsn`, and enhanced `TrustLevelInfo`
+- **Service Layer Expansion**: New services for DNIS, retry management, and brand configuration
+- **Comprehensive API**: Brand-specific endpoints, DNIS configuration, and enhanced health checks
+- **Improved Code Quality**: Fixed all compilation issues and updated test expectations
+
+### 📋 Documentation Updates
+📋 **For detailed information about all improvements, see [README.md](README.md)**
+📋 **For DNIS configuration details, see API documentation**
 📋 **For trust-based authentication details, see [ROYAL_BANK_TRUST_AUTHENTICATION.md](ROYAL_BANK_TRUST_AUTHENTICATION.md)**
 
 ## Table of Contents
@@ -23,53 +38,75 @@ This guide reflects the most recent system improvements:
 3. [Step 1: Define Your Bank's Authentication Strategy](#step-1-define-your-banks-authentication-strategy)
 4. [Step 2: Implement Custom Token Validators](#step-2-implement-custom-token-validators)
 5. [Step 3: Create Brand Configuration](#step-3-create-brand-configuration)
-6. [Step 4: Database/Data Model Extensions](#step-4-databasedata-model-extensions)
-7. [Step 5: Testing Your Implementation](#step-5-testing-your-implementation)
-8. [Step 6: Configuration and Deployment](#step-6-configuration-and-deployment)
-9. [Smart Token Re-asking Logic](#smart-token-re-asking-logic)
-10. [Trust-Based Authentication (Advanced)](#trust-based-authentication-advanced)
+6. [Step 4: Configure DNIS Support](#step-4-configure-dnis-support)
+7. [Step 5: Database/Data Model Extensions](#step-5-databasedata-model-extensions)
+8. [Step 6: Testing Your Implementation](#step-6-testing-your-implementation)
+9. [Step 7: Configuration and Deployment](#step-7-configuration-and-deployment)
+10. [Advanced Features](#advanced-features)
 11. [Troubleshooting](#troubleshooting)
 12. [Best Practices](#best-practices)
 13. [Migration Guide](#migration-guide)
 
 ## Overview
 
-The IVR Authentication System supports multiple banks (brands) with their own authentication requirements. Each bank can have:
+The IVR Authentication System supports multiple banks (brands) with their own authentication requirements and DNIS configurations. Each bank can have:
 
 - **Custom Token Types**: Unique authentication methods (PIN, SSN, biometrics, etc.)
 - **Brand-Specific Validation Logic**: Different rules for validating the same token type
-- **Custom Retry Policies**: Brand-specific attempt limits and lockout rules
-- **Tailored User Experience**: Custom messages and prompts
-- **🆕 Trust-Based Authentication**: Advanced conditional logic based on trust levels and phone matching
+- **DNIS-Based Routing**: Phone number-specific authentication rules and security controls
+- **Advanced Retry Policies**: Progressive lockout, cross-token delays, and suspicious activity detection
+- **Custom User Experience**: Brand-specific messages, prompts, and authentication flows
+- **Trust-Based Authentication**: Advanced conditional logic based on trust levels and phone matching
+- **Post-Validation Security**: Additional security checks after successful token validation
 
 ### Key Architecture Components
 
+- **AuthenticationOrchestrator**: Central orchestration of authentication flows
 - **TokenValidator**: Interface for implementing token validation logic
-- **BrandAuthConfiguration**: Interface for defining brand-specific authentication rules
+- **BrandAuthConfigurationService**: Brand-specific authentication configuration management
+- **DnisConfigurationService**: DNIS-based routing and security configuration
+- **TokenRetryManagementService**: Advanced retry logic and lockout management
+- **PostValidationRuleService**: Additional security rules after token validation
 - **TokenValidationService**: Central service that manages all validators (brand-aware)
-- **CustomerProfile**: Data model containing customer authentication information
+- **CustomerProfile**: Enhanced data model with trust level and authentication information
 
 ### Current System Status
 
 ✅ **Fully Operational Components**:
-- Brand-aware token validation
+- Brand-aware authentication with comprehensive configuration
+- DNIS support with phone number-based routing
+- Advanced retry management with progressive lockout
+- Trust level integration and phone match validation
+- Failed token tracking with smart re-asking logic
+- Post-validation security rules
+- Comprehensive test suite (170+ tests)
+- Enhanced error handling and logging
+- Security improvements and PII protection
 - Simplified encryption utilities (`EncryptionUtil.hash()` and `EncryptionUtil.verify()`)
-- Streamlined controller logging
-- Clean import statements
-- Comprehensive test coverage
+- Streamlined controller logging and clean import statements
 
 ## Prerequisites
 
 Before starting, ensure you have:
 
 1. **Development Environment**: Java 17+, Spring Boot 3.1+, Maven
-2. **Database Access**: Ability to modify customer profile schema if needed
+2. **Database Access**: Ability to modify customer profile schema if needed (in-memory storage available)
 3. **Brand Information**: 
    - Brand code (unique identifier)
-   - Authentication token priorities
-   - Security policies and rules
-   - Custom messages and prompts
-4. **Test Customer Data**: Sample customer profiles for testing
+   - Authentication token priorities and definitions
+   - Security policies and retry strategies
+   - Custom messages and prompts for different scenarios
+   - Failure handling policies and lockout configurations
+4. **DNIS Configuration**:
+   - Phone numbers (DNIS) that will route to your brand
+   - DNIS-specific security requirements
+   - Authentication method restrictions per DNIS
+   - Session timeout and attempt limit configurations
+5. **Trust Level Requirements**:
+   - Phone match validation rules
+   - Trust level-based authentication decisions
+   - Risk assessment criteria
+6. **Test Customer Data**: Sample customer profiles with various trust levels for testing
 
 ## Step 1: Define Your Bank's Authentication Strategy
 
@@ -81,40 +118,113 @@ Select a unique brand code that will identify your bank throughout the system.
 - `METRO_CREDIT_UNION`
 - `FIRST_NATIONAL_BANK`
 - `TECH_BANK`
+- `DIGITAL_BANK`
 
-### 1.2 Define Authentication Requirements
+### 1.2 Define Comprehensive Authentication Requirements
 
-Document your bank's authentication strategy:
+Document your bank's complete authentication strategy:
 
 ```yaml
 Brand: TECH_BANK
+Description: "Modern digital bank with mobile-first authentication"
+
+# Core Authentication Configuration
 Token Priorities: 
   - Primary (Priority 150): MOBILE_PIN (4-6 digits)
   - Secondary (Priority 120): BIOMETRIC_ID 
   - Fallback (Priority 100): ACCOUNT_NUMBER
-Additional Tokens:
-  - SECURITY_QUESTION (Priority 80)
-  - EMAIL_VERIFICATION (Priority 60)
+  - Backup (Priority 80): SECURITY_QUESTION
+  - Emergency (Priority 60): EMAIL_VERIFICATION
+
+# Security Policies
 Security Policies:
   - Max Overall Attempts: 5
   - Individual Token Attempts: 3
   - Lockout Duration: 15 minutes
   - Multi-Factor Preferred: Yes
+  - Concurrent Token Auth: Allowed
+  - Progressive Lockout: Enabled
+
+# DNIS Configuration
+DNIS Numbers:
+  - "18005551234": Mobile banking services (medium security)
+  - "18005559999": Premium customer line (high security)
+  - "18005550000": General customer service (standard security)
+
+# Trust Level Rules
+Trust Level Configuration:
+  - GREEN (High Trust): Single factor authentication allowed
+  - YELLOW (Medium Trust): Multi-factor required
+  - RED (Low Trust): Enhanced verification required
+  - Phone Match: Required for all authentications
+
+# Retry Management
+Retry Strategies:
+  - MOBILE_PIN: Linear backoff (3s, 6s, 9s delays)
+  - BIOMETRIC_ID: Immediate retry (biometric failures are instant)
+  - ACCOUNT_NUMBER: Exponential backoff (2s, 4s, 8s delays)
+  - Cross-Token Delay: 5 seconds after any failed attempt
+
+# Brand Messages
+Custom Messages:
+  - Welcome: "Welcome to Tech Bank Digital Services!"
+  - Success: "Authentication successful. How can we help you today?"
+  - Failure: "Authentication failed. Please contact Tech Bank Support at 1-800-TECH-BANK."
+  - Session Expired: "Your session has expired. Please call back to restart authentication."
 ```
 
-### 1.3 Plan Token Priority
+### 1.3 Plan Token Priority and Flow
 
-Determine the order in which tokens should be requested:
+Determine the order in which tokens should be requested based on:
 
-1. **Primary Token** (highest priority): Most secure/preferred method
-2. **Secondary Tokens**: Fallback options
-3. **Backup Tokens**: Emergency authentication methods
+1. **Security Level**: Most secure methods first
+2. **User Experience**: Easiest/fastest methods preferred
+3. **Availability**: Ensure fallback options for all customers
+4. **Trust Level**: Adjust requirements based on customer trust level
+
+**Example Flow for TECH_BANK:**
+```
+High Trust Customer (GREEN):
+1. MOBILE_PIN (single factor sufficient)
+
+Medium Trust Customer (YELLOW):
+1. MOBILE_PIN + BIOMETRIC_ID (multi-factor required)
+
+Low Trust Customer (RED):
+1. MOBILE_PIN + BIOMETRIC_ID + SECURITY_QUESTION (enhanced verification)
+```
+
+### 1.4 Define DNIS-Specific Rules
+
+Plan how different phone numbers should handle authentication:
+
+```yaml
+DNIS Configurations:
+  "18005551234": # Mobile banking line
+    - Allow: [MOBILE_PIN, BIOMETRIC_ID]
+    - Require Multi-Factor: No
+    - Max Attempts: 5
+    - Session Timeout: 10 minutes
+    
+  "18005559999": # Premium customer line  
+    - Allow: [MOBILE_PIN, BIOMETRIC_ID, ACCOUNT_NUMBER]
+    - Require Multi-Factor: Yes
+    - Max Attempts: 3
+    - Session Timeout: 15 minutes
+    - Enhanced Security: Enabled
+    
+  "18005550000": # General customer service
+    - Allow: [ACCOUNT_NUMBER, SECURITY_QUESTION]
+    - Require Multi-Factor: No
+    - Max Attempts: 5
+    - Session Timeout: 8 minutes
+```
 
 ## Step 2: Implement Custom Token Validators
 
-### 2.1 Create Basic Token Validator
+### 2.1 Create Enhanced Token Validator
 
-For each custom token type, create a validator class implementing `TokenValidator`:
+For each custom token type, create a validator class implementing `TokenValidator` with the latest architecture:
 
 ```java
 // File: src/main/java/com/bank/ivr/auth/validator/impl/TechBankMobilePinValidator.java
@@ -129,7 +239,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Tech Bank specific Mobile PIN validator.
- * Supports 4-6 digit PINs with brand-specific security rules.
+ * Supports 4-6 digit PINs with brand-specific security rules and enhanced validation.
  */
 @Component
 public class TechBankMobilePinValidator implements TokenValidator {
@@ -149,7 +259,7 @@ public class TechBankMobilePinValidator implements TokenValidator {
     @Override
     public boolean validate(String customerIdentifierValue, String providedTokenValue, CustomerProfile customerProfile) {
         if (customerProfile.getMobilePin() == null || providedTokenValue == null) {
-            logger.debug("Mobile PIN validation failed: null values");
+            logger.debug("Mobile PIN validation failed: null values for customer {}", customerIdentifierValue);
             return false;
         }
         
@@ -161,14 +271,20 @@ public class TechBankMobilePinValidator implements TokenValidator {
             return false;
         }
         
+        // Additional Tech Bank specific validations
+        if (!passesTechBankSecurityChecks(normalizedProvided, customerProfile)) {
+            logger.debug("Mobile PIN validation failed: security checks for customer {}", customerIdentifierValue);
+            return false;
+        }
+        
         try {
             // Use the simplified encryption utility
             boolean isValid = EncryptionUtil.verify(normalizedProvided, customerProfile.getMobilePin());
             
             if (isValid) {
-                logger.debug("Mobile PIN validation successful for customer {}", customerIdentifierValue);
+                logger.info("Mobile PIN validation successful for customer {}", customerIdentifierValue);
             } else {
-                logger.debug("Mobile PIN validation failed for customer {}", customerIdentifierValue);
+                logger.warn("Mobile PIN validation failed for customer {}", customerIdentifierValue);
             }
             
             return isValid;
@@ -183,8 +299,8 @@ public class TechBankMobilePinValidator implements TokenValidator {
         if (providedTokenValue == null) {
             return null;
         }
-        // Remove all non-digit characters
-        return providedTokenValue.replaceAll("[^0-9]", "");
+        // Remove all non-digit characters and trim
+        return providedTokenValue.replaceAll("[^0-9]", "").trim();
     }
     
     @Override
@@ -192,30 +308,74 @@ public class TechBankMobilePinValidator implements TokenValidator {
         return 150; // High priority for this brand
     }
     
+    /**
+     * Tech Bank specific PIN format validation
+     */
     private boolean isValidTechBankPinFormat(String pin) {
         // Tech Bank allows 4-6 digit PINs
-        return pin != null && pin.matches("^\\d{4,6}$");
+        if (pin == null || !pin.matches("^\\d{4,6}$")) {
+            return false;
+        }
+        
+        // Additional Tech Bank rules: no sequential numbers, no repeated digits
+        return !hasSequentialDigits(pin) && !hasAllSameDigits(pin);
+    }
+    
+    /**
+     * Additional security checks specific to Tech Bank
+     */
+    private boolean passesTechBankSecurityChecks(String pin, CustomerProfile customerProfile) {
+        // Tech Bank specific: PIN cannot be part of phone number or account number
+        String phoneDigits = extractDigits(customerProfile.getPhoneNumber());
+        String accountDigits = extractDigits(customerProfile.getAccountNumber());
+        
+        return !phoneDigits.contains(pin) && !accountDigits.contains(pin);
+    }
+    
+    private boolean hasSequentialDigits(String pin) {
+        for (int i = 0; i < pin.length() - 2; i++) {
+            int digit1 = Character.getNumericValue(pin.charAt(i));
+            int digit2 = Character.getNumericValue(pin.charAt(i + 1));
+            int digit3 = Character.getNumericValue(pin.charAt(i + 2));
+            
+            if (digit2 == digit1 + 1 && digit3 == digit2 + 1) {
+                return true; // Found sequential digits
+            }
+        }
+        return false;
+    }
+    
+    private boolean hasAllSameDigits(String pin) {
+        char firstDigit = pin.charAt(0);
+        return pin.chars().allMatch(c -> c == firstDigit);
+    }
+    
+    private String extractDigits(String value) {
+        return value != null ? value.replaceAll("[^0-9]", "") : "";
     }
 }
 ```
 
-### 2.2 Important Notes on Encryption
+### 2.2 Important Notes on Enhanced Architecture
 
-⚠️ **Updated Encryption Methods**: The system now uses simplified encryption utilities:
+⚠️ **Updated System Architecture**: The system now includes several new components:
 
 - **Use**: `EncryptionUtil.hash(plainText)` for hashing
 - **Use**: `EncryptionUtil.verify(plainText, hashedText)` for verification
-- **Deprecated**: `hashPin()` and `verifyPin()` methods have been removed
+- **Enhanced Logging**: More detailed logging with customer context
+- **Security Checks**: Brand-specific security validations
+- **Error Handling**: Improved exception handling and logging
 
-### 2.3 Create Additional Validators
+### 2.3 Create Trust-Level Aware Validator
 
-For each token type your bank uses, create similar validator classes. Here's an example for a biometric ID validator:
+For advanced authentication scenarios, create validators that consider trust levels:
 
 ```java
 // File: src/main/java/com/bank/ivr/auth/validator/impl/TechBankBiometricValidator.java
 package com.bank.ivr.auth.validator.impl;
 
 import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.validator.TokenValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,21 +398,35 @@ public class TechBankBiometricValidator implements TokenValidator {
     
     @Override
     public boolean validate(String customerIdentifierValue, String providedTokenValue, CustomerProfile customerProfile) {
-        // Implement biometric validation logic
-        // This could involve calling external biometric services
-        
         if (customerProfile.getBiometricId() == null || providedTokenValue == null) {
-            logger.debug("Biometric validation failed: null values");
+            logger.debug("Biometric validation failed: null values for customer {}", customerIdentifierValue);
             return false;
         }
         
-        // Example: Simple string comparison (in reality, this would be more complex)
-        boolean isValid = providedTokenValue.equals(customerProfile.getBiometricId());
+        String normalizedProvided = normalizeTokenValue(providedTokenValue);
         
-        logger.debug("Biometric validation {} for customer {}", 
-                    isValid ? "successful" : "failed", customerIdentifierValue);
+        // Enhanced validation with trust level consideration
+        if (!isValidBiometricFormat(normalizedProvided)) {
+            logger.debug("Biometric validation failed: invalid format for customer {}", customerIdentifierValue);
+            return false;
+        }
         
-        return isValid;
+        try {
+            // In a real implementation, this would call external biometric services
+            // For demo purposes, we'll use simple string comparison
+            boolean isValid = normalizedProvided.equals(customerProfile.getBiometricId());
+            
+            if (isValid) {
+                logger.info("Biometric validation successful for customer {}", customerIdentifierValue);
+            } else {
+                logger.warn("Biometric validation failed for customer {}", customerIdentifierValue);
+            }
+            
+            return isValid;
+        } catch (Exception e) {
+            logger.error("Error validating Biometric ID for customer {}: {}", customerIdentifierValue, e.getMessage());
+            return false;
+        }
     }
     
     @Override
@@ -260,13 +434,106 @@ public class TechBankBiometricValidator implements TokenValidator {
         if (providedTokenValue == null) {
             return null;
         }
-        // Biometric IDs might need specific normalization
+        // Biometric IDs need specific normalization
         return providedTokenValue.trim().toUpperCase();
     }
     
     @Override
     public int getPriority() {
         return 120; // Medium-high priority
+    }
+    
+    /**
+     * Validate biometric ID format for Tech Bank
+     */
+    private boolean isValidBiometricFormat(String biometricId) {
+        // Tech Bank biometric IDs: alphanumeric with underscores, 8-16 characters
+        return biometricId != null && biometricId.matches("^[A-Z0-9_]{8,16}$");
+    }
+}
+```
+
+### 2.4 Create DNIS-Aware Validator
+
+For validators that need to consider DNIS-specific rules:
+
+```java
+// File: src/main/java/com/bank/ivr/auth/validator/impl/TechBankAccountNumberValidator.java
+package com.bank.ivr.auth.validator.impl;
+
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.validator.TokenValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+@Component
+public class TechBankAccountNumberValidator implements TokenValidator {
+    
+    private static final Logger logger = LoggerFactory.getLogger(TechBankAccountNumberValidator.class);
+    
+    @Override
+    public String getTokenName() {
+        return "ACCOUNT_NUMBER";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "TECH_BANK";
+    }
+    
+    @Override
+    public boolean validate(String customerIdentifierValue, String providedTokenValue, CustomerProfile customerProfile) {
+        if (customerProfile.getAccountNumber() == null || providedTokenValue == null) {
+            logger.debug("Account number validation failed: null values for customer {}", customerIdentifierValue);
+            return false;
+        }
+        
+        String normalizedProvided = normalizeTokenValue(providedTokenValue);
+        String normalizedStored = normalizeTokenValue(customerProfile.getAccountNumber());
+        
+        // Validate account number format
+        if (!isValidTechBankAccountFormat(normalizedProvided)) {
+            logger.debug("Account number validation failed: invalid format for customer {}", customerIdentifierValue);
+            return false;
+        }
+        
+        try {
+            boolean isValid = normalizedProvided.equals(normalizedStored);
+            
+            if (isValid) {
+                logger.info("Account number validation successful for customer {}", customerIdentifierValue);
+            } else {
+                logger.warn("Account number validation failed for customer {}", customerIdentifierValue);
+            }
+            
+            return isValid;
+        } catch (Exception e) {
+            logger.error("Error validating Account Number for customer {}: {}", customerIdentifierValue, e.getMessage());
+            return false;
+        }
+    }
+    
+    @Override
+    public String normalizeTokenValue(String providedTokenValue) {
+        if (providedTokenValue == null) {
+            return null;
+        }
+        // Remove all non-alphanumeric characters and convert to uppercase
+        return providedTokenValue.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+    }
+    
+    @Override
+    public int getPriority() {
+        return 100; // Medium priority
+    }
+    
+    /**
+     * Tech Bank specific account number format validation
+     */
+    private boolean isValidTechBankAccountFormat(String accountNumber) {
+        // Tech Bank account numbers: 8-12 digits, may include letters
+        return accountNumber != null && accountNumber.matches("^[A-Z0-9]{8,12}$");
     }
 }
 ```
@@ -457,9 +724,42 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
 }
 ```
 
-## Step 4: Database/Data Model Extensions
+## Step 4: Configure DNIS Support
 
-### 4.1 Extend CustomerProfile
+### 4.1 Implement DnisConfiguration
+
+Create a configuration class that defines your bank's DNIS configuration:
+
+```java
+// File: src/main/java/com/bank/ivr/auth/config/impl/TechBankDnisConfiguration.java
+package com.bank.ivr.auth.config.impl;
+
+import com.bank.ivr.auth.config.DnisConfiguration;
+import org.springframework.stereotype.Component;
+
+@Component
+public class TechBankDnisConfiguration implements DnisConfiguration {
+    
+    @Override
+    public String getBrandCode() {
+        return "TECH_BANK";
+    }
+    
+    @Override
+    public String getDnisPrefix() {
+        return "+1555";
+    }
+    
+    @Override
+    public String getDnisSuffix() {
+        return "";
+    }
+}
+```
+
+## Step 5: Database/Data Model Extensions
+
+### 5.1 Extend CustomerProfile
 
 If your bank uses custom authentication data, extend the `CustomerProfile` model:
 
@@ -485,7 +785,7 @@ public class CustomerProfile {
 }
 ```
 
-### 4.2 Update Repository
+### 5.2 Update Repository
 
 Update your repository to handle the new fields:
 
@@ -509,9 +809,9 @@ public void initializeTestData() {
 }
 ```
 
-## Step 5: Testing Your Implementation
+## Step 6: Testing Your Implementation
 
-### 5.1 Create Unit Tests
+### 6.1 Create Unit Tests
 
 Create comprehensive tests for your validators:
 
@@ -588,7 +888,7 @@ class TechBankMobilePinValidatorTest {
 }
 ```
 
-### 5.2 Create Integration Tests
+### 6.2 Create Integration Tests
 
 Test the complete authentication flow:
 
@@ -654,7 +954,7 @@ class TechBankIntegrationTest {
 }
 ```
 
-### 5.3 Test Brand Configuration
+### 6.3 Test Brand Configuration
 
 Verify your brand configuration is loaded correctly:
 
@@ -673,9 +973,9 @@ void shouldLoadTechBankConfiguration() {
 }
 ```
 
-## Step 6: Configuration and Deployment
+## Step 7: Configuration and Deployment
 
-### 6.1 Application Properties
+### 7.1 Application Properties
 
 Add any necessary configuration to `application.yml`:
 
@@ -695,7 +995,7 @@ logging:
     com.bank.ivr.auth.validator.impl.TechBank: DEBUG
 ```
 
-### 6.2 Deployment Checklist
+### 7.2 Deployment Checklist
 
 Before deploying to production:
 
@@ -707,28 +1007,9 @@ Before deploying to production:
 - [ ] Security review completed
 - [ ] Performance testing completed
 
-## Smart Token Re-asking Logic
+## Advanced Features
 
-The system includes intelligent token re-asking logic that prevents asking for tokens that have already failed validation:
-
-### How It Works
-
-1. **User provides wrong token**: System marks it as "validation failed"
-2. **System won't re-ask**: That specific token won't be asked again
-3. **Alternative tokens**: System asks for different tokens instead
-4. **Smart fallback**: Uses priority-based selection for alternatives
-
-### Example Flow
-
-```
-1. System asks for MOBILE_PIN
-2. User provides wrong PIN → marked as failed
-3. System asks for BIOMETRIC_ID (next priority)
-4. User provides correct biometric → success
-5. System never re-asks for MOBILE_PIN in this session
-```
-
-## Trust-Based Authentication (Advanced)
+### 8.1 Trust-Based Authentication (Advanced)
 
 🆕 **New in v1.3**: The system now supports advanced trust-based authentication that can make conditional decisions based on trust levels and phone number matching status.
 

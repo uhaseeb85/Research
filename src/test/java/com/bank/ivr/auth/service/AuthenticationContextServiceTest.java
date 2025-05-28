@@ -1,5 +1,26 @@
 package com.bank.ivr.auth.service;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
@@ -8,23 +29,6 @@ import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.bank.ivr.auth.repository.AuthenticationContextRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthenticationContextService Tests")
@@ -66,7 +70,9 @@ class AuthenticationContextServiceTest {
                 null,
                 null,
                 "TEST_BANK",
-                trustLevelInfo
+                trustLevelInfo,
+                null, // dnis
+                null  // sessionSsn
         );
 
         // Set up customer profile
@@ -367,7 +373,9 @@ class AuthenticationContextServiceTest {
                 null,
                 null,
                 "PREMIUM_BANK",
-                request.getTrustLevelInfo()
+                request.getTrustLevelInfo(),
+                null, // dnis
+                null  // sessionSsn
         );
 
         String attemptId = "attempt-premium";
