@@ -2,9 +2,9 @@ package com.bank.ivr.auth.controller;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItems;
@@ -100,7 +100,7 @@ class AuthenticationControllerTest {
         when(brandConfigService.isBrandSupported("PREMIUM_BANK")).thenReturn(true);
         when(brandConfigService.isBrandSupported("COMMUNITY_BANK")).thenReturn(true);
         when(brandConfigService.isBrandSupported("UNSUPPORTED_BRAND")).thenReturn(false);
-        when(brandConfigService.getAvailableBrands()).thenReturn(Set.of("PREMIUM_BANK", "COMMUNITY_BANK"));
+        when(brandConfigService.getAvailableBrands()).thenReturn(new HashSet<>(Arrays.asList("PREMIUM_BANK", "COMMUNITY_BANK")));
         
         // Default brand configuration responses
         when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);

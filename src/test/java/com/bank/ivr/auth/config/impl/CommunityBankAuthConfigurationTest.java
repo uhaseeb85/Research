@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -82,9 +83,10 @@ class CommunityBankAuthConfigurationTest {
             // Then
             assertThat(tokenDefinitions).hasSize(5);
             
-            List<String> tokenNames = tokenDefinitions.stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> tokenNames = new ArrayList<String>();
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                tokenNames.add(token.getName());
+            }
             
             assertThat(tokenNames).containsExactlyInAnyOrder(
                     "SSN", "DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME", 
@@ -99,10 +101,14 @@ class CommunityBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition ssnToken = tokenDefinitions.stream()
-                    .filter(token -> "SSN".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition ssnToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("SSN".equals(token.getName())) {
+                    ssnToken = token;
+                    break;
+                }
+            }
+            assertThat(ssnToken).isNotNull();
 
             assertThat(ssnToken.getPriority()).isEqualTo(100);
             assertThat(ssnToken.getDescription()).isEqualTo("Social Security Number");
@@ -116,10 +122,14 @@ class CommunityBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition dobToken = tokenDefinitions.stream()
-                    .filter(token -> "DATE_OF_BIRTH".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition dobToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("DATE_OF_BIRTH".equals(token.getName())) {
+                    dobToken = token;
+                    break;
+                }
+            }
+            assertThat(dobToken).isNotNull();
 
             assertThat(dobToken.getPriority()).isEqualTo(95);
             assertThat(dobToken.getDescription()).isEqualTo("Date of Birth");
@@ -133,10 +143,14 @@ class CommunityBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition accountOpeningToken = tokenDefinitions.stream()
-                    .filter(token -> "ACCOUNT_OPENING_DATE".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition accountOpeningToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("ACCOUNT_OPENING_DATE".equals(token.getName())) {
+                    accountOpeningToken = token;
+                    break;
+                }
+            }
+            assertThat(accountOpeningToken).isNotNull();
 
             assertThat(accountOpeningToken.getPriority()).isEqualTo(80);
             assertThat(accountOpeningToken.getDescription()).isEqualTo("Account Opening Date");
@@ -156,8 +170,6 @@ class CommunityBankAuthConfigurationTest {
             }
         }
     }
-
-
 
     @Nested
     @DisplayName("Brand Specific Token Attempts Tests")
@@ -360,16 +372,15 @@ class CommunityBankAuthConfigurationTest {
     @DisplayName("Configuration Consistency Tests")
     class ConfigurationConsistencyTests {
 
-
-
         @Test
         @DisplayName("Brand specific attempts should exist in token definitions")
         void brandSpecificAttemptsShouldExistInTokenDefinitions() {
             // When
             Map<String, Integer> brandAttempts = config.getBrandSpecificTokenAttempts();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> definedTokens = new ArrayList<String>();
+            for (AuthTokenDefinition token : config.getTokenDefinitions()) {
+                definedTokens.add(token.getName());
+            }
 
             // Then
             assertThat(definedTokens).containsAll(brandAttempts.keySet());
@@ -380,9 +391,10 @@ class CommunityBankAuthConfigurationTest {
         void retryStrategyTokensShouldExistInTokenDefinitions() {
             // When
             Map<String, TokenRetryStrategy> retryStrategies = config.getTokenRetryStrategies();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> definedTokens = new ArrayList<String>();
+            for (AuthTokenDefinition token : config.getTokenDefinitions()) {
+                definedTokens.add(token.getName());
+            }
 
             // Then
             assertThat(definedTokens).containsAll(retryStrategies.keySet());

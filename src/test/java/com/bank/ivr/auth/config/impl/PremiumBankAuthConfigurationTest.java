@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -82,9 +83,10 @@ class PremiumBankAuthConfigurationTest {
             // Then
             assertThat(tokenDefinitions).hasSize(5);
             
-            List<String> tokenNames = tokenDefinitions.stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> tokenNames = new ArrayList<String>();
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                tokenNames.add(token.getName());
+            }
             
             assertThat(tokenNames).containsExactlyInAnyOrder(
                     "DEBIT_CARD_PIN", "SSN", "DATE_OF_BIRTH", 
@@ -99,10 +101,14 @@ class PremiumBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition pinToken = tokenDefinitions.stream()
-                    .filter(token -> "DEBIT_CARD_PIN".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition pinToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("DEBIT_CARD_PIN".equals(token.getName())) {
+                    pinToken = token;
+                    break;
+                }
+            }
+            assertThat(pinToken).isNotNull();
 
             assertThat(pinToken.getPriority()).isEqualTo(100);
             assertThat(pinToken.getDescription()).isEqualTo("Debit Card PIN");
@@ -116,10 +122,14 @@ class PremiumBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition ssnToken = tokenDefinitions.stream()
-                    .filter(token -> "SSN".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition ssnToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("SSN".equals(token.getName())) {
+                    ssnToken = token;
+                    break;
+                }
+            }
+            assertThat(ssnToken).isNotNull();
 
             assertThat(ssnToken.getPriority()).isEqualTo(95);
             assertThat(ssnToken.getMaxAttempts()).isEqualTo(2); // Stricter than community bank
@@ -132,10 +142,14 @@ class PremiumBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition voiceToken = tokenDefinitions.stream()
-                    .filter(token -> "VOICE_BIOMETRIC".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition voiceToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("VOICE_BIOMETRIC".equals(token.getName())) {
+                    voiceToken = token;
+                    break;
+                }
+            }
+            assertThat(voiceToken).isNotNull();
 
             assertThat(voiceToken.getPriority()).isEqualTo(80);
             assertThat(voiceToken.getDescription()).isEqualTo("Voice Authentication");
@@ -149,10 +163,14 @@ class PremiumBankAuthConfigurationTest {
             List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
 
             // Then
-            AuthTokenDefinition maidenNameToken = tokenDefinitions.stream()
-                    .filter(token -> "MOTHER_MAIDEN_NAME".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
+            AuthTokenDefinition maidenNameToken = null;
+            for (AuthTokenDefinition token : tokenDefinitions) {
+                if ("MOTHER_MAIDEN_NAME".equals(token.getName())) {
+                    maidenNameToken = token;
+                    break;
+                }
+            }
+            assertThat(maidenNameToken).isNotNull();
 
             assertThat(maidenNameToken.getMaxAttempts()).isEqualTo(2); // Stricter than community bank
         }
@@ -171,8 +189,6 @@ class PremiumBankAuthConfigurationTest {
             }
         }
     }
-
-
 
     @Nested
     @DisplayName("Brand Specific Token Attempts Tests")
@@ -423,8 +439,6 @@ class PremiumBankAuthConfigurationTest {
             assertThat(globalPolicy.getSuspiciousActivityThreshold()).isLessThanOrEqualTo(4); // Low threshold
         }
 
-
-
         @Test
         @DisplayName("Should use advanced retry strategies")
         void shouldUseAdvancedRetryStrategies() {
@@ -432,11 +446,21 @@ class PremiumBankAuthConfigurationTest {
             Map<String, TokenRetryStrategy> strategies = config.getTokenRetryStrategies();
 
             // Then
-            boolean hasExponentialBackoff = strategies.values().stream()
-                    .anyMatch(strategy -> strategy.getRetryType() == TokenRetryStrategy.RetryType.EXPONENTIAL_BACKOFF);
+            boolean hasExponentialBackoff = false;
+            for (TokenRetryStrategy strategy : strategies.values()) {
+                if (strategy.getRetryType() == TokenRetryStrategy.RetryType.EXPONENTIAL_BACKOFF) {
+                    hasExponentialBackoff = true;
+                    break;
+                }
+            }
             
-            boolean hasProgressiveLockouts = strategies.values().stream()
-                    .allMatch(TokenRetryStrategy::isProgressiveLockoutEnabled);
+            boolean hasProgressiveLockouts = true;
+            for (TokenRetryStrategy strategy : strategies.values()) {
+                if (!strategy.isProgressiveLockoutEnabled()) {
+                    hasProgressiveLockouts = false;
+                    break;
+                }
+            }
 
             assertThat(hasExponentialBackoff).isTrue();
             assertThat(hasProgressiveLockouts).isTrue();
@@ -447,16 +471,15 @@ class PremiumBankAuthConfigurationTest {
     @DisplayName("Configuration Consistency Tests")
     class ConfigurationConsistencyTests {
 
-
-
         @Test
         @DisplayName("Brand specific attempts should exist in token definitions")
         void brandSpecificAttemptsShouldExistInTokenDefinitions() {
             // When
             Map<String, Integer> brandAttempts = config.getBrandSpecificTokenAttempts();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> definedTokens = new ArrayList<String>();
+            for (AuthTokenDefinition token : config.getTokenDefinitions()) {
+                definedTokens.add(token.getName());
+            }
 
             // Then
             assertThat(definedTokens).containsAll(brandAttempts.keySet());
@@ -467,9 +490,10 @@ class PremiumBankAuthConfigurationTest {
         void retryStrategyTokensShouldExistInTokenDefinitions() {
             // When
             Map<String, TokenRetryStrategy> retryStrategies = config.getTokenRetryStrategies();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
+            List<String> definedTokens = new ArrayList<String>();
+            for (AuthTokenDefinition token : config.getTokenDefinitions()) {
+                definedTokens.add(token.getName());
+            }
 
             // Then
             assertThat(definedTokens).containsAll(retryStrategies.keySet());

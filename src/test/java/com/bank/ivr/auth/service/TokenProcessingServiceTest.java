@@ -134,7 +134,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(pinToken),
+                Arrays.asList(pinToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -163,7 +163,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(ssnToken),
+                Arrays.asList(ssnToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -193,7 +193,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(ssnToken),
+                Arrays.asList(ssnToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -222,7 +222,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(ssnToken),
+                Arrays.asList(ssnToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -310,7 +310,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(ssnToken),
+                Arrays.asList(ssnToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -345,7 +345,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(ssnToken),
+                Arrays.asList(ssnToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -376,7 +376,7 @@ class TokenProcessingServiceTest {
                 request.getSessionId(),
                 request.getCustomerIdentifier(),
                 request.getAttemptId(),
-                List.of(secondaryToken),
+                Arrays.asList(secondaryToken),
                 request.getBrand(),
                 request.getTrustLevelInfo()
         );
@@ -407,7 +407,7 @@ class TokenProcessingServiceTest {
                     request.getSessionId(),
                     request.getCustomerIdentifier(),
                     request.getAttemptId(),
-                    List.of(pinToken),
+                    Arrays.asList(pinToken),
                     request.getBrand(),
                     request.getTrustLevelInfo()
             );
@@ -451,7 +451,7 @@ class TokenProcessingServiceTest {
                     request.getSessionId(),
                     request.getCustomerIdentifier(),
                     request.getAttemptId(),
-                    List.of(dobToken),
+                    Arrays.asList(dobToken),
                     request.getBrand(),
                     request.getTrustLevelInfo()
             );
@@ -483,7 +483,7 @@ class TokenProcessingServiceTest {
                     request.getSessionId(),
                     request.getCustomerIdentifier(),
                     request.getAttemptId(),
-                    List.of(pinToken),
+                    Arrays.asList(pinToken),
                     request.getBrand(),
                     request.getTrustLevelInfo()
             );
@@ -523,7 +523,7 @@ class TokenProcessingServiceTest {
                     request.getSessionId(),
                     request.getCustomerIdentifier(),
                     request.getAttemptId(),
-                    List.of(pinToken),
+                    Arrays.asList(pinToken),
                     request.getBrand(),
                     request.getTrustLevelInfo()
             );
