@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -121,19 +122,20 @@ public class InMemoryAuthenticationContextRepository implements AuthenticationCo
     
     @Override
     public void deleteExpiredContexts() {
-        final int[] cleanedCount = {0};
+        int cleanedCount = 0;
         
-        // Remove expired entries
-        storage.entrySet().removeIf(entry -> {
+        // Remove expired entries using iterator
+        Iterator<Map.Entry<String, AuthenticationContextEntry>> iterator = storage.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, AuthenticationContextEntry> entry = iterator.next();
             if (entry.getValue().isExpired()) {
-                cleanedCount[0]++;
-                return true;
+                iterator.remove();
+                cleanedCount++;
             }
-            return false;
-        });
+        }
         
-        if (cleanedCount[0] > 0) {
-            logger.debug("Cleaned up {} expired authentication contexts", cleanedCount[0]);
+        if (cleanedCount > 0) {
+            logger.debug("Cleaned up {} expired authentication contexts", cleanedCount);
         }
     }
     

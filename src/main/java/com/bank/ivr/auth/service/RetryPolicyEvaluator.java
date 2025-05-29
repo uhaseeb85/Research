@@ -60,12 +60,24 @@ public class RetryPolicyEvaluator {
         long baseDelay = strategy.getBaseDelayMs();
         int attemptCount = tokenState.getAttemptCount();
         
-        long calculatedDelay = switch (strategy.getRetryType()) {
-            case IMMEDIATE -> 0;
-            case FIXED_DELAY -> baseDelay;
-            case LINEAR_BACKOFF -> baseDelay * attemptCount;
-            case EXPONENTIAL_BACKOFF -> (long) (baseDelay * Math.pow(strategy.getMultiplier(), attemptCount - 1));
-        };
+        long calculatedDelay;
+        switch (strategy.getRetryType()) {
+            case IMMEDIATE:
+                calculatedDelay = 0;
+                break;
+            case FIXED_DELAY:
+                calculatedDelay = baseDelay;
+                break;
+            case LINEAR_BACKOFF:
+                calculatedDelay = baseDelay * attemptCount;
+                break;
+            case EXPONENTIAL_BACKOFF:
+                calculatedDelay = (long) (baseDelay * Math.pow(strategy.getMultiplier(), attemptCount - 1));
+                break;
+            default:
+                calculatedDelay = 0;
+                break;
+        }
         
         // Apply global failure multiplier for cross-token delays
         if (globalState != null && globalState.getTotalFailures() > 1) {

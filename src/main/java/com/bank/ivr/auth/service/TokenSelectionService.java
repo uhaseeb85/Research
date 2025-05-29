@@ -9,8 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service responsible for determining which authentication token to ask for next.
@@ -133,11 +135,24 @@ public class TokenSelectionService {
     private List<TokenSelectionRule> getApplicableRules(AuthenticationContext context, 
                                                        CustomerProfile customerProfile, 
                                                        String brand) {
-        return tokenSelectionRules.stream()
-                .filter(rule -> isBrandApplicable(rule, brand))
-                .filter(rule -> rule.isApplicable(context, customerProfile))
-                .sorted((r1, r2) -> Integer.compare(r2.getPriority(), r1.getPriority())) // Highest priority first
-                .collect(Collectors.toList());
+        List<TokenSelectionRule> applicableRules = new ArrayList<>();
+        
+        // Filter applicable rules
+        for (TokenSelectionRule rule : tokenSelectionRules) {
+            if (isBrandApplicable(rule, brand) && rule.isApplicable(context, customerProfile)) {
+                applicableRules.add(rule);
+            }
+        }
+        
+        // Sort by priority (highest first)
+        Collections.sort(applicableRules, new Comparator<TokenSelectionRule>() {
+            @Override
+            public int compare(TokenSelectionRule r1, TokenSelectionRule r2) {
+                return Integer.compare(r2.getPriority(), r1.getPriority());
+            }
+        });
+        
+        return applicableRules;
     }
     
     /**
@@ -152,10 +167,12 @@ public class TokenSelectionService {
      * Finds a token definition by name.
      */
     private AuthTokenDefinition findTokenDefinition(String tokenName, List<AuthTokenDefinition> brandTokenDefinitions) {
-        return brandTokenDefinitions.stream()
-                .filter(token -> token.getName().equals(tokenName))
-                .findFirst()
-                .orElse(null);
+        for (AuthTokenDefinition token : brandTokenDefinitions) {
+            if (token.getName().equals(tokenName)) {
+                return token;
+            }
+        }
+        return null;
     }
     
     /**

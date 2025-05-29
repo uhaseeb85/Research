@@ -54,7 +54,10 @@ public class BaseTokenDefinitions {
                 .maxAttempts(baseToken.getMaxAttempts());
         
         // Apply customizations
-        customizations.forEach((property, value) -> {
+        for (Map.Entry<String, Object> entry : customizations.entrySet()) {
+            String property = entry.getKey();
+            Object value = entry.getValue();
+            
             switch (property.toLowerCase()) {
                 case "priority":
                     builder.priority((Integer) value);
@@ -71,7 +74,7 @@ public class BaseTokenDefinitions {
                 default:
                     throw new IllegalArgumentException("Unknown property: " + property);
             }
-        });
+        }
         
         return builder.build();
     }

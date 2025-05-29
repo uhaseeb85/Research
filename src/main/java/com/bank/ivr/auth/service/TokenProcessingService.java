@@ -87,8 +87,13 @@ public class TokenProcessingService {
                 }
                 
                 // Skip if we already have this token type
-                boolean alreadyHaveThisType = allTokens.stream()
-                    .anyMatch(t -> t.getTokenName().equals(tokenDef.getName()));
+                boolean alreadyHaveThisType = false;
+                for (ProvidedToken t : allTokens) {
+                    if (t.getTokenName().equals(tokenDef.getName())) {
+                        alreadyHaveThisType = true;
+                        break;
+                    }
+                }
                 if (alreadyHaveThisType) {
                     continue;
                 }
@@ -444,7 +449,7 @@ public class TokenProcessingService {
             // DNIS doesn't allow retry - mark as failed immediately
             context.getTokenAttemptsRemaining().put(providedToken.getTokenName(), 0);
             context.decrementOverallAttempts();
-            logger.debug("DNIS strict mode - token {} marked with 0 attempts remaining", providedToken.getTokenName());
+            logger.debug("DNIS strict mode - token {} marked with 0 attempts remaining");
         }
     }
     

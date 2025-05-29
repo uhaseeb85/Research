@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -234,7 +235,13 @@ public class GlobalRetryState {
         
         // Remove old timestamps (older than 5 minutes for rapid failure detection)
         LocalDateTime fiveMinutesAgo = now.minusMinutes(5);
-        failureTimestamps.removeIf(timestamp -> timestamp.isBefore(fiveMinutesAgo));
+        Iterator<LocalDateTime> iterator = failureTimestamps.iterator();
+        while (iterator.hasNext()) {
+            LocalDateTime timestamp = iterator.next();
+            if (timestamp.isBefore(fiveMinutesAgo)) {
+                iterator.remove();
+            }
+        }
         
         rapidFailureCount = failureTimestamps.size();
     }
