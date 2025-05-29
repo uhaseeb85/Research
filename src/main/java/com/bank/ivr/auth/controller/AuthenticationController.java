@@ -96,25 +96,6 @@ public class AuthenticationController {
             } else {
                 logger.debug("No DNIS found in session context for session: {}", sessionId);
             }
-            
-            if (sessionSsnList != null && !sessionSsnList.isEmpty()) {
-                logger.info("Session SSN list retrieved from context for session: {} (count: {})", sessionId, sessionSsnList.size());
-            } else {
-                logger.debug("No session SSN found in context for session: {}", sessionId);
-            }
-        
-            // Validate brand support
-            if (!brandConfigService.isBrandSupported(brand)) {
-                logger.warn("Unsupported brand: {} - Supported brands: {}", brand, brandConfigService.getAvailableBrands());
-                
-                AuthenticationResponse errorResponse = AuthenticationResponse.builder()
-                        .attemptId(attemptId)
-                        .status(AuthenticationResponse.AuthStatus.FAILED)
-                        .message("Brand '" + brand + "' is not supported")
-                        .build();
-                
-                return ResponseEntity.badRequest().body(errorResponse);
-            }
         
             // Pass the context information to the orchestrator
             AuthenticationResponse response = authenticationOrchestrator.authenticateCustomer(request, dnis, sessionSsnList);
