@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always read the README.md before making any changes. Target Java 1.8 compliance. Always update Junits after making any new changes. Make sure to update the README file with any new changes. Do not use complex streaming API from Java or lambdas.

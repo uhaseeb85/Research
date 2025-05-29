@@ -2,11 +2,11 @@ package com.bank.ivr.auth.controller;
 
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
-import jakarta.validation.ConstraintViolationException;
+import org.springframework.http.HttpStatus;
+// import javax.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -62,6 +62,7 @@ public class GlobalExceptionHandler {
     /**
      * Handles constraint violation exceptions.
      */
+    /*
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<AuthenticationResponse> handleConstraintViolationException(
             ConstraintViolationException ex, WebRequest request) {
@@ -82,6 +83,7 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.badRequest().body(errorResponse);
     }
+    */
     
     /**
      * Handles malformed JSON requests.

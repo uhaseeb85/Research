@@ -30,7 +30,7 @@ import com.bank.ivr.auth.service.DnisConfigurationService;
 import com.bank.ivr.auth.service.SessionContextService;
 import com.bank.ivr.auth.util.LoggingUtil;
 
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 
 /**
  * REST controller for IVR authentication operations.

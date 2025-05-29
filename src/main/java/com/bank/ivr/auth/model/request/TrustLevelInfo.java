@@ -2,7 +2,7 @@ package com.bank.ivr.auth.model.request;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotNull;
+import javax.validation.constraints.NotNull;
 
 /**
  * Captures trust level and phone matching information for advanced authentication rules.

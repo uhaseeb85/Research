@@ -1,6 +1,8 @@
 package com.bank.ivr.auth.service;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,7 +65,7 @@ class TokenValidationServiceTest {
     @Test
     void shouldAllowDifferentValidatorsForSameTokenAcrossDifferentBrands() {
         // Given: Validators for the same token but different brands
-        List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(defaultSsnValidator, communityBankSsnValidator);
         
         // When: Creating TokenValidationService
         TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
@@ -77,7 +79,7 @@ class TokenValidationServiceTest {
     @Test
     void shouldThrowExceptionWhenMultipleValidatorsForSameTokenAndBrand() {
         // Given: Two validators for the same token and brand
-        List<TokenValidator> validators = List.of(communityBankSsnValidator, duplicateCommunityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(communityBankSsnValidator, duplicateCommunityBankSsnValidator);
         
         // When & Then: Should throw IllegalStateException
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
@@ -91,7 +93,7 @@ class TokenValidationServiceTest {
     @Test
     void shouldReturnCorrectValidatorForBrandTokenCombination() {
         // Given: Validators for different brands
-        List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(defaultSsnValidator, communityBankSsnValidator);
         TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return correct validators for each brand
@@ -103,7 +105,7 @@ class TokenValidationServiceTest {
     @Test
     void shouldReturnBrandSpecificTokenNames() {
         // Given: Validators for different brands
-        List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(defaultSsnValidator, communityBankSsnValidator);
         TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return token names for specific brands
@@ -118,7 +120,7 @@ class TokenValidationServiceTest {
         when(defaultSsnValidator.validate("customer1", "123456789", testProfile)).thenReturn(true);
         when(communityBankSsnValidator.validate("customer1", "123456789", testProfile)).thenReturn(false);
         
-        List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(defaultSsnValidator, communityBankSsnValidator);
         TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Different brands should use different validators
@@ -129,11 +131,11 @@ class TokenValidationServiceTest {
     @Test
     void shouldReturnBrandTokenCombinations() {
         // Given: Validators for different brands
-        List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
+        List<TokenValidator> validators = Arrays.asList(defaultSsnValidator, communityBankSsnValidator);
         TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return all brand+token combinations
-        var combinations = service.getSupportedBrandTokenCombinations();
+        Set<String> combinations = service.getSupportedBrandTokenCombinations();
         assertTrue(combinations.contains("DEFAULT:SSN"));
         assertTrue(combinations.contains("COMMUNITY_BANK:SSN"));
         assertEquals(2, combinations.size());

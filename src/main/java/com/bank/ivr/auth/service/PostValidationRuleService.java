@@ -1,7 +1,9 @@
 package com.bank.ivr.auth.service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,12 +89,22 @@ public class PostValidationRuleService {
                                                        AuthenticationContext context,
                                                        CustomerProfile customerProfile,
                                                        String brand) {
-        return postValidationRules.stream()
-                .filter(rule -> isBrandApplicable(rule, brand))
-                .filter(rule -> isTokenApplicable(rule, validatedToken))
-                .filter(rule -> rule.isApplicable(validatedToken, context, customerProfile))
-                .sorted((r1, r2) -> Integer.compare(r2.getPriority(), r1.getPriority())) // Highest priority first
-                .collect(Collectors.toList());
+        List<PostValidationRule> applicableRules = new ArrayList<>();
+        
+        for (PostValidationRule rule : postValidationRules) {
+            if (isBrandApplicable(rule, brand) && isTokenApplicable(rule, validatedToken) && rule.isApplicable(validatedToken, context, customerProfile)) {
+                applicableRules.add(rule);
+            }
+        }
+        
+        Collections.sort(applicableRules, new Comparator<PostValidationRule>() {
+            @Override
+            public int compare(PostValidationRule r1, PostValidationRule r2) {
+                return Integer.compare(r2.getPriority(), r1.getPriority());
+            }
+        });
+        
+        return applicableRules;
     }
     
     /**
@@ -123,9 +135,21 @@ public class PostValidationRuleService {
      * Gets rules applicable to a specific brand.
      */
     public List<PostValidationRule> getRulesForBrand(String brand) {
-        return postValidationRules.stream()
-                .filter(rule -> isBrandApplicable(rule, brand))
-                .sorted((r1, r2) -> Integer.compare(r2.getPriority(), r1.getPriority()))
-                .collect(Collectors.toList());
+        List<PostValidationRule> applicableRules = new ArrayList<>();
+        
+        for (PostValidationRule rule : postValidationRules) {
+            if (isBrandApplicable(rule, brand)) {
+                applicableRules.add(rule);
+            }
+        }
+        
+        Collections.sort(applicableRules, new Comparator<PostValidationRule>() {
+            @Override
+            public int compare(PostValidationRule r1, PostValidationRule r2) {
+                return Integer.compare(r2.getPriority(), r1.getPriority());
+            }
+        });
+        
+        return applicableRules;
     }
 } 

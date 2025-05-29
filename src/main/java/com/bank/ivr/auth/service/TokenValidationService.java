@@ -192,10 +192,14 @@ public class TokenValidationService {
      * @return a set of token names
      */
     public java.util.Set<String> getSupportedTokenNamesForBrand(String brand) {
-        return validatorMap.entrySet().stream()
-                .filter(entry -> entry.getKey().startsWith(brand + ":"))
-                .map(entry -> extractTokenFromKey(entry.getKey()))
-                .collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> tokenNames = new java.util.HashSet<>();
+        for (Map.Entry<String, TokenValidator> entry : validatorMap.entrySet()) {
+            if (entry.getKey().startsWith(brand + ":")) {
+                String tokenName = extractTokenFromKey(entry.getKey());
+                tokenNames.add(tokenName);
+            }
+        }
+        return tokenNames;
     }
     
 
@@ -260,16 +264,14 @@ public class TokenValidationService {
     private void logValidatorMapping() {
         if (logger.isDebugEnabled()) {
             logger.debug("Validator mapping:");
-            validatorMap.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> {
-                        String[] parts = entry.getKey().split(":");
-                        String brand = parts[0];
-                        String token = parts[1];
-                        TokenValidator validator = entry.getValue();
-                        logger.debug("  Brand: {}, Token: {}, Validator: {}, Priority: {}", 
-                                   brand, token, validator.getClass().getSimpleName(), validator.getPriority());
-                    });
+            for (Map.Entry<String, TokenValidator> entry : validatorMap.entrySet()) {
+                String[] parts = entry.getKey().split(":");
+                String brand = parts[0];
+                String token = parts[1];
+                TokenValidator validator = entry.getValue();
+                logger.debug("  Brand: {}, Token: {}, Validator: {}, Priority: {}", 
+                           brand, token, validator.getClass().getSimpleName(), validator.getPriority());
+            }
         }
     }
 } 

@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +30,6 @@ public class SessionContextService {
         this.objectMapper = objectMapper;
     }
     
-    @PostConstruct
     public void loadSampleContextData() {
         try {
             ClassPathResource resource = new ClassPathResource("sample-session-contexts.json");
@@ -80,8 +78,11 @@ public class SessionContextService {
      * @return Optional containing the DNIS if found
      */
     public Optional<String> getDnisFromSession(String sessionId) {
-        return getSessionContext(sessionId)
-                .map(SessionContext::getDnis);
+        Optional<SessionContext> contextOpt = getSessionContext(sessionId);
+        if (contextOpt.isPresent()) {
+            return Optional.ofNullable(contextOpt.get().getDnis());
+        }
+        return Optional.empty();
     }
     
     /**
@@ -91,8 +92,11 @@ public class SessionContextService {
      * @return Optional containing the list of SSNs if found
      */
     public Optional<List<String>> getSessionSsnFromSession(String sessionId) {
-        return getSessionContext(sessionId)
-                .map(SessionContext::getSessionSsn);
+        Optional<SessionContext> contextOpt = getSessionContext(sessionId);
+        if (contextOpt.isPresent()) {
+            return Optional.ofNullable(contextOpt.get().getSessionSsn());
+        }
+        return Optional.empty();
     }
     
     /**
