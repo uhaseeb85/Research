@@ -13,12 +13,14 @@ import org.springframework.stereotype.Service;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.AuthenticationContext;
 import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.DnisConfiguration;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.bank.ivr.auth.rule.impl.FullAuthenticationCompletionRule;
 
 /**
- * Service responsible for building brand-aware authentication responses based on context state.
+ * Service responsible for building authentication responses based on context state.
+ * Now supports brand-aware responses and smart re-asking logic.
  */
 @Service
 public class AuthenticationResponseService {
@@ -27,16 +29,13 @@ public class AuthenticationResponseService {
     
     private final AuthenticationContextService contextService;
     private final BrandAuthConfigurationService brandConfigService;
-    private final BrandFailurePolicyService failurePolicyService;
     
     @Autowired
     public AuthenticationResponseService(
             AuthenticationContextService contextService,
-            BrandAuthConfigurationService brandConfigService,
-            BrandFailurePolicyService failurePolicyService) {
+            BrandAuthConfigurationService brandConfigService) {
         this.contextService = contextService;
         this.brandConfigService = brandConfigService;
-        this.failurePolicyService = failurePolicyService;
     }
     
     /**
@@ -88,38 +87,15 @@ public class AuthenticationResponseService {
                     .build();
         }
         
-        // Check brand-specific failure policy
-        if (failurePolicyService.shouldFailAuthentication(context, customerProfile, brand)) {
-            context.setCurrentStatus(AuthStatus.FAILED);
-            contextService.deleteContext(context.getAttemptId());
-            
-            // Use brand-specific failure message based on policy
-            String failureMessage = brandConfigService.getBrandMessage(brand, "policy_failure");
-            if (failureMessage == null) {
-                failureMessage = brandConfigService.getBrandMessage(brand, "failure");
-                if (failureMessage == null) {
-                    failureMessage = "Authentication failed. Unable to verify your identity with available methods.";
-                }
-            }
-            
-            return AuthenticationResponse.builder()
-                    .attemptId(context.getAttemptId())
-                    .status(AuthStatus.FAILED)
-                    .message(failureMessage)
-                    .failedTokens(context.getFailedTokens())
-                    .authenticatedTokens(context.getAuthenticatedTokens())
-                    .build();
-        }
-        
-        // Determine next token to ask using brand-specific token definitions and failure policy
+        // Determine next token to ask using brand-specific token definitions
         AuthTokenDefinition nextToken = determineNextToken(context, brandTokenDefinitions);
         if (nextToken == null) {
             // Try to get alternative token based on failure policy
-            nextToken = failurePolicyService.getNextAlternativeToken(context, brand, brandTokenDefinitions);
+            nextToken = determineNextToken(context, brandTokenDefinitions);
             
             if (nextToken == null) {
                 // Check if partial authentication is allowed
-                if (failurePolicyService.isPartialAuthenticationAllowed(context, brand)) {
+                if (isPartialAuthenticationAllowed(context, brand)) {
                     context.setCurrentStatus(AuthStatus.AUTHENTICATED);
                     contextService.deleteContext(context.getAttemptId());
                     
@@ -317,6 +293,253 @@ public class AuthenticationResponseService {
                 return secondaryPrompt.replace("{token_description}", nextToken.getDescription());
             }
             return "Thank you. Now please provide your " + nextToken.getDescription() + ".";
+        }
+    }
+
+    /**
+     * Builds the response based on the current context state with full brand awareness and DNIS configuration.
+     */
+    public AuthenticationResponse buildResponseWithDnis(AuthenticationContext context, CustomerProfile customerProfile, 
+                                                       String brand, DnisConfiguration dnisConfig) {
+        logger.debug("Building DNIS-aware response for attempt: {}, brand: {}, dnis: {}", 
+                    context.getAttemptId(), brand, dnisConfig.getDnis());
+        
+        // Get brand-specific token definitions filtered by DNIS configuration
+        List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
+        List<AuthTokenDefinition> dnisFilteredTokens = filterTokensByDnis(brandTokenDefinitions, dnisConfig);
+        
+        // Check for authentication completion
+        FullAuthenticationCompletionRule completionRule = new FullAuthenticationCompletionRule();
+        
+        // Check if DNIS requires multi-factor authentication
+        boolean requiresMultiFactor = dnisConfig.isRequireMultiFactorAuth();
+        if (requiresMultiFactor && context.getAuthenticatedTokens().size() < 2) {
+            logger.debug("DNIS requires multi-factor authentication, current tokens: {}", 
+                        context.getAuthenticatedTokens().size());
+        }
+        
+        if (completionRule.isAuthenticationComplete(context, customerProfile) && 
+            (!requiresMultiFactor || context.getAuthenticatedTokens().size() >= 2)) {
+            context.setCurrentStatus(AuthStatus.AUTHENTICATED);
+            contextService.deleteContext(context.getAttemptId());
+            
+            // Use brand-specific success message
+            String successMessage = brandConfigService.getBrandMessage(brand, "success");
+            if (successMessage == null) {
+                successMessage = "Authentication successful. Welcome!";
+            }
+            
+            return AuthenticationResponse.builder()
+                    .attemptId(context.getAttemptId())
+                    .status(AuthStatus.AUTHENTICATED)
+                    .message(successMessage)
+                    .authenticatedTokens(context.getAuthenticatedTokens())
+                    .failedTokens(context.getFailedTokens())
+                    .build();
+        }
+        
+        // Check for overall attempts exhaustion using DNIS-specific limits
+        int maxAttempts = dnisConfig.getMaxAuthenticationAttempts();
+        if (context.getOverallAttemptsRemaining() <= 0 || 
+            (maxAttempts > 0 && context.getOverallAttemptsRemaining() > maxAttempts)) {
+            context.setCurrentStatus(AuthStatus.FAILED);
+            contextService.deleteContext(context.getAttemptId());
+            
+            // Use brand-specific failure message
+            String failureMessage = brandConfigService.getBrandMessage(brand, "failure");
+            if (failureMessage == null) {
+                failureMessage = "Authentication failed. Too many incorrect attempts.";
+            }
+            
+            return AuthenticationResponse.builder()
+                    .attemptId(context.getAttemptId())
+                    .status(AuthStatus.FAILED)
+                    .message(failureMessage)
+                    .failedTokens(context.getFailedTokens())
+                    .build();
+        }
+        
+        // Determine next token using DNIS-filtered token definitions
+        AuthTokenDefinition nextToken = determineNextToken(context, dnisFilteredTokens);
+        if (nextToken == null) {
+            // Try alternative tokens based on DNIS allowance
+            if (dnisConfig.isAllowAlternativeTokens()) {
+                nextToken = determineNextToken(context, dnisFilteredTokens);
+            }
+            
+            if (nextToken == null) {
+                // Check if partial authentication is allowed
+                if (isPartialAuthenticationAllowed(context, brand)) {
+                    context.setCurrentStatus(AuthStatus.AUTHENTICATED);
+                    contextService.deleteContext(context.getAttemptId());
+                    
+                    String partialSuccessMessage = brandConfigService.getBrandMessage(brand, "partial_success");
+                    if (partialSuccessMessage == null) {
+                        partialSuccessMessage = "Partial authentication successful. Limited access granted.";
+                    }
+                    
+                    return AuthenticationResponse.builder()
+                            .attemptId(context.getAttemptId())
+                            .status(AuthStatus.AUTHENTICATED)
+                            .message(partialSuccessMessage)
+                            .authenticatedTokens(context.getAuthenticatedTokens())
+                            .failedTokens(context.getFailedTokens())
+                            .build();
+                }
+                
+                // No alternatives and no partial auth - fail
+                context.setCurrentStatus(AuthStatus.FAILED);
+                contextService.deleteContext(context.getAttemptId());
+                
+                String noMethodsMessage = buildDnisFailureMessage(brand, dnisConfig);
+                
+                return AuthenticationResponse.builder()
+                        .attemptId(context.getAttemptId())
+                        .status(AuthStatus.FAILED)
+                        .message(noMethodsMessage)
+                        .failedTokens(context.getFailedTokens())
+                        .authenticatedTokens(context.getAuthenticatedTokens())
+                        .build();
+            }
+        }
+        
+        // Track that this token was asked in this attempt
+        context.setLastAskedToken(nextToken.getName());
+        context.addAskedToken(nextToken.getName());
+        
+        logger.debug("Token {} has been marked as asked for attempt {} (DNIS: {}). AskedTokens now: {}", 
+                    nextToken.getName(), context.getAttemptId(), dnisConfig.getDnis(), context.getAskedTokens());
+        
+        // Determine secondary tokens using DNIS-filtered definitions
+        List<AuthTokenDefinition> secondaryTokens = determineSecondaryTokens(context, nextToken, dnisFilteredTokens);
+        
+        // Build remaining attempts map
+        Map<String, Integer> remainingAttempts = new HashMap<>(context.getTokenAttemptsRemaining());
+        remainingAttempts.put("OVERALL", context.getOverallAttemptsRemaining());
+        
+        return AuthenticationResponse.builder()
+                .attemptId(context.getAttemptId())
+                .status(context.getAuthenticatedTokens().isEmpty() ? 
+                       AuthStatus.PENDING_PRIMARY_TOKEN : AuthStatus.PENDING_MORE_TOKENS)
+                .message(buildMessageWithDnis(nextToken, context, brand, dnisConfig))
+                .primaryTokenToAsk(nextToken)
+                .secondaryTokensAccepted(secondaryTokens)
+                .remainingAttempts(remainingAttempts)
+                .authenticatedTokens(context.getAuthenticatedTokens())
+                .failedTokens(context.getFailedTokens())
+                .build();
+    }
+    
+    /**
+     * Filters token definitions based on DNIS configuration.
+     */
+    private List<AuthTokenDefinition> filterTokensByDnis(List<AuthTokenDefinition> tokenDefinitions, DnisConfiguration dnisConfig) {
+        List<AuthTokenDefinition> filteredTokens = new ArrayList<>();
+        
+        for (AuthTokenDefinition token : tokenDefinitions) {
+            if (isTokenAllowedByDnis(token.getName(), dnisConfig)) {
+                filteredTokens.add(token);
+            } else {
+                logger.debug("Token '{}' filtered out by DNIS configuration '{}'", token.getName(), dnisConfig.getDnis());
+            }
+        }
+        
+        return filteredTokens;
+    }
+    
+    /**
+     * Checks if a token is allowed by DNIS configuration.
+     */
+    private boolean isTokenAllowedByDnis(String tokenName, DnisConfiguration dnisConfig) {
+        switch (tokenName.toUpperCase()) {
+            case "SSN":
+            case "SSN_LAST_4":
+            case "SSN_FULL":
+                return dnisConfig.isAllowSsnAuthentication();
+            case "DEBIT_CARD_PIN":
+            case "PIN":
+                return dnisConfig.isAllowPinAuthentication();
+            case "DATE_OF_BIRTH":
+                return dnisConfig.isAllowDateOfBirthAuthentication();
+            case "MOTHER_MAIDEN_NAME":
+                return dnisConfig.isAllowMotherMaidenNameAuthentication();
+            case "ACCOUNT_NUMBER":
+                return dnisConfig.isAllowAccountNumberAuthentication();
+            default:
+                return true; // Allow unknown tokens by default
+        }
+    }
+    
+    /**
+     * Builds failure message considering DNIS configuration.
+     */
+    private String buildDnisFailureMessage(String brand, DnisConfiguration dnisConfig) {
+        String failureMessage = brandConfigService.getBrandMessage(brand, "no_methods");
+        if (failureMessage == null) {
+            if (dnisConfig.isEnableStrictValidation()) {
+                failureMessage = "Authentication failed. Strict security policy applied.";
+            } else {
+                failureMessage = "No available authentication methods.";
+            }
+        }
+        return failureMessage;
+    }
+    
+    /**
+     * Builds message with DNIS considerations.
+     */
+    private String buildMessageWithDnis(AuthTokenDefinition nextToken, AuthenticationContext context, 
+                                       String brand, DnisConfiguration dnisConfig) {
+        String message = buildMessage(nextToken, context, brand);
+        
+        // Add DNIS-specific messaging if strict validation is enabled
+        if (dnisConfig.isEnableStrictValidation()) {
+            message += " (Enhanced security applied)";
+        }
+        
+        // Add multi-factor requirement message if needed
+        if (dnisConfig.isRequireMultiFactorAuth() && context.getAuthenticatedTokens().size() == 1) {
+            message += " Additional verification required.";
+        }
+        
+        return message;
+    }
+
+    /**
+     * Checks if partial authentication is allowed based on the context and brand.
+     * This method determines if the authentication can succeed with fewer tokens
+     * than normally required based on brand policies and current authentication state.
+     */
+    private boolean isPartialAuthenticationAllowed(AuthenticationContext context, String brand) {
+        // Check if the brand supports partial authentication
+        int authenticatedTokenCount = context.getAuthenticatedTokens().size();
+        
+        // Minimum requirement: at least one token must be authenticated
+        if (authenticatedTokenCount == 0) {
+            logger.debug("Partial authentication denied - no tokens authenticated for brand: {}", brand);
+            return false;
+        }
+        
+        // Brand-specific logic for partial authentication
+        switch (brand) {
+            case "PREMIUM_BANK":
+                // Premium bank requires at least 1 high-priority token
+                return authenticatedTokenCount >= 1;
+                
+            case "COMMUNITY_BANK":
+                // Community bank is more lenient, allows partial with 1 token
+                return authenticatedTokenCount >= 1;
+                
+            case "TECH_BANK":
+                // Tech bank requires at least 1 token but prefers 2
+                return authenticatedTokenCount >= 1;
+                
+            default:
+                // Default policy: allow partial authentication with at least 1 token
+                boolean allowed = authenticatedTokenCount >= 1;
+                logger.debug("Partial authentication for brand '{}': {} (authenticated tokens: {})", 
+                           brand, allowed, authenticatedTokenCount);
+                return allowed;
         }
     }
 } 

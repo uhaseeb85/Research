@@ -1,15 +1,17 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.rule.EligibilityRule;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.DnisConfiguration;
+import com.bank.ivr.auth.rule.EligibilityRule;
 
 /**
  * Service responsible for determining which authentication tokens a customer is eligible for.
@@ -85,9 +87,57 @@ public class EligibilityService {
         return eligibleTokens;
     }
     
-
+    /**
+     * Determines which tokens a customer is eligible for based on their profile, brand, and DNIS configuration.
+     * Uses rule-based evaluation with brand-specific token filtering and DNIS restrictions for flexible business logic.
+     */
+    public List<String> determineEligibleTokensWithDnis(CustomerProfile customerProfile, String brand, DnisConfiguration dnisConfig) {
+        List<String> eligibleTokens = new ArrayList<>();
+        
+        logger.debug("Determining DNIS-aware eligible tokens for customer: {}, brand: {}, dnis: {}", 
+                    customerProfile.getCustomerId(), brand, dnisConfig.getDnis());
+        
+        // First get brand-eligible tokens
+        List<String> brandEligibleTokens = determineEligibleTokens(customerProfile, brand);
+        
+        // Filter tokens based on DNIS configuration
+        for (String tokenName : brandEligibleTokens) {
+            if (isTokenAllowedByDnis(tokenName, dnisConfig)) {
+                eligibleTokens.add(tokenName);
+                logger.debug("Token '{}' allowed for DNIS '{}'", tokenName, dnisConfig.getDnis());
+            } else {
+                logger.debug("Token '{}' blocked by DNIS configuration '{}'", tokenName, dnisConfig.getDnis());
+            }
+        }
+        
+        logger.debug("Final DNIS-aware eligible tokens for brand '{}', DNIS '{}': {}", 
+                    brand, dnisConfig.getDnis(), eligibleTokens);
+        return eligibleTokens;
+    }
     
-
+    /**
+     * Checks if a specific token is allowed by the DNIS configuration.
+     */
+    private boolean isTokenAllowedByDnis(String tokenName, DnisConfiguration dnisConfig) {
+        switch (tokenName.toUpperCase()) {
+            case "SSN":
+            case "SSN_LAST_4":
+            case "SSN_FULL":
+                return dnisConfig.isAllowSsnAuthentication();
+            case "DEBIT_CARD_PIN":
+            case "PIN":
+                return dnisConfig.isAllowPinAuthentication();
+            case "DATE_OF_BIRTH":
+                return dnisConfig.isAllowDateOfBirthAuthentication();
+            case "MOTHER_MAIDEN_NAME":
+                return dnisConfig.isAllowMotherMaidenNameAuthentication();
+            case "ACCOUNT_NUMBER":
+                return dnisConfig.isAllowAccountNumberAuthentication();
+            default:
+                // Allow unknown tokens by default (backward compatibility)
+                return true;
+        }
+    }
     
     /**
      * Fallback logic for token eligibility when rules fail, with brand awareness.

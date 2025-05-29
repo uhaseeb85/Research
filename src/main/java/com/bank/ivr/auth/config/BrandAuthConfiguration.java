@@ -1,12 +1,11 @@
 package com.bank.ivr.auth.config;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
-
 import java.util.List;
 import java.util.Map;
+
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
+import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 
 /**
  * Interface for brand-specific authentication configuration.
@@ -71,14 +70,6 @@ public interface BrandAuthConfiguration {
      * @return global retry configuration
      */
     BrandGlobalRetryPolicy getGlobalRetryPolicy();
-    
-    /**
-     * Gets the brand-specific failure policy.
-     * Determines when to fail authentication vs. ask for alternative tokens.
-     * 
-     * @return brand failure policy configuration
-     */
-    BrandFailurePolicy getBrandFailurePolicy();
     
     /**
      * Gets the priority of this configuration (used when multiple configs match).
