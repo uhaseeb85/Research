@@ -69,9 +69,7 @@ public class AuthenticationContext {
         return tokenState.getAuthenticatedTokens();
     }
     
-    public List<String> getRequiredTokensForFullAuth() {
-        return tokenState.getRequiredTokensForFullAuth();
-    }
+
     
     public List<String> getFailedTokens() {
         return tokenState.getFailedTokens();
@@ -119,9 +117,7 @@ public class AuthenticationContext {
         tokenState.setAuthenticatedTokens(authenticatedTokens);
     }
     
-    public void setRequiredTokensForFullAuth(List<String> requiredTokensForFullAuth) {
-        tokenState.setRequiredTokensForFullAuth(requiredTokensForFullAuth);
-    }
+
     
     public void setFailedTokens(List<String> failedTokens) {
         tokenState.setFailedTokens(failedTokens);
@@ -309,10 +305,7 @@ public class AuthenticationContext {
             return this;
         }
         
-        public Builder requiredTokensForFullAuth(List<String> requiredTokensForFullAuth) {
-            getTokenStateBuilder().requiredTokensForFullAuth(requiredTokensForFullAuth);
-            return this;
-        }
+
         
         public Builder failedTokens(List<String> failedTokens) {
             getTokenStateBuilder().failedTokens(failedTokens);

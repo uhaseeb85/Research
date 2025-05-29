@@ -1,22 +1,19 @@
 package com.bank.ivr.auth.config.impl;
 
-import com.bank.ivr.auth.config.BrandAuthConfiguration;
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
-import org.springframework.stereotype.Component;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.bank.ivr.auth.config.BrandAuthConfiguration;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
+import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
+
 /**
- * Royal Bank authentication configuration with trust-level based authentication.
- * Supports SSN last 4 digits and full SSN based on trust level and phone matching.
+ * Configuration for Royal Bank - trust-level-based authentication strategy.
+ * Adapts authentication requirements based on customer trust level.
  */
-@Component
 public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
@@ -65,11 +62,7 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Royal Bank requires at least one SSN-based authentication
-        return Arrays.asList("SSN_LAST_4", "SSN_FULL");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -133,21 +126,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
             .globalLockoutThreshold(3)
             .escalationThreshold(2)
             .globalLockoutDuration(java.time.Duration.ofMinutes(15))
-            .build();
-    }
-    
-    @Override
-    public BrandFailurePolicy getBrandFailurePolicy() {
-        return BrandFailurePolicy.builder()
-            .brandCode("ROYAL_BANK")
-            .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
-            .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PRIORITY_BASED)
-            .requiredTokenFailureThreshold(3)
-            .maxAlternativeAttempts(2)
-            .allowPartialAuthentication(false)
-            .failOnCriticalTokenFailure(true)
-            .enableGracefulDegradation(true)
-            .degradationThreshold(2)
             .build();
     }
     

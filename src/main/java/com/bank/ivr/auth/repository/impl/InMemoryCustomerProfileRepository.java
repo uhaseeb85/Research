@@ -1,15 +1,17 @@
 package com.bank.ivr.auth.repository.impl;
 
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.repository.CustomerProfileRepository;
-import com.bank.ivr.auth.util.EncryptionUtil;
-import org.springframework.stereotype.Repository;
-
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import org.springframework.stereotype.Repository;
+
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.repository.CustomerProfileRepository;
+import com.bank.ivr.auth.util.EncryptionUtil;
+
+import jakarta.annotation.PostConstruct;
 
 /**
  * In-memory implementation of CustomerProfileRepository.
@@ -21,6 +23,7 @@ public class InMemoryCustomerProfileRepository implements CustomerProfileReposit
     private final Map<String, CustomerProfile> customerIdIndex = new HashMap<>();
     private final Map<String, CustomerProfile> phoneNumberIndex = new HashMap<>();
     private final Map<String, CustomerProfile> accountNumberIndex = new HashMap<>();
+    private final Map<String, CustomerProfile> ssnIndex = new HashMap<>();
     
     /**
      * Initialize with sample test data
@@ -109,6 +112,9 @@ public class InMemoryCustomerProfileRepository implements CustomerProfileReposit
         if (customer.getAccountNumber() != null) {
             accountNumberIndex.put(customer.getAccountNumber(), customer);
         }
+        if (customer.getSsn() != null) {
+            ssnIndex.put(customer.getSsn(), customer);
+        }
     }
     
     @Override
@@ -127,6 +133,11 @@ public class InMemoryCustomerProfileRepository implements CustomerProfileReposit
     }
     
     @Override
+    public Optional<CustomerProfile> findBySsn(String ssn) {
+        return Optional.ofNullable(ssnIndex.get(ssn));
+    }
+    
+    @Override
     public Optional<CustomerProfile> findByIdentifier(String identifierType, String identifierValue) {
         switch (identifierType) {
             case "PHONE_NUMBER":
@@ -135,6 +146,8 @@ public class InMemoryCustomerProfileRepository implements CustomerProfileReposit
                 return findByAccountNumber(identifierValue);
             case "CUSTOMER_ID":
                 return findByCustomerId(identifierValue);
+            case "SSN":
+                return findBySsn(identifierValue);
             default:
                 return Optional.empty();
         }
@@ -153,5 +166,10 @@ public class InMemoryCustomerProfileRepository implements CustomerProfileReposit
     @Override
     public boolean existsByAccountNumber(String accountNumber) {
         return accountNumberIndex.containsKey(accountNumber);
+    }
+    
+    @Override
+    public boolean existsBySsn(String ssn) {
+        return ssnIndex.containsKey(ssn);
     }
 } 

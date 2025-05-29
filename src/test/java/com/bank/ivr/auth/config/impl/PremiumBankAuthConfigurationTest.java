@@ -172,21 +172,7 @@ class PremiumBankAuthConfigurationTest {
         }
     }
 
-    @Nested
-    @DisplayName("Required Tokens Tests")
-    class RequiredTokensTests {
 
-        @Test
-        @DisplayName("Should require two authentication factors")
-        void shouldRequireTwoAuthenticationFactors() {
-            // When
-            List<String> requiredTokens = config.getRequiredTokens();
-
-            // Then
-            assertThat(requiredTokens).hasSize(2);
-            assertThat(requiredTokens).containsExactlyInAnyOrder("DEBIT_CARD_PIN", "DATE_OF_BIRTH");
-        }
-    }
 
     @Nested
     @DisplayName("Brand Specific Token Attempts Tests")
@@ -437,15 +423,7 @@ class PremiumBankAuthConfigurationTest {
             assertThat(globalPolicy.getSuspiciousActivityThreshold()).isLessThanOrEqualTo(4); // Low threshold
         }
 
-        @Test
-        @DisplayName("Should require multiple authentication factors")
-        void shouldRequireMultipleAuthenticationFactors() {
-            // When
-            List<String> requiredTokens = config.getRequiredTokens();
 
-            // Then
-            assertThat(requiredTokens).hasSizeGreaterThan(1);
-        }
 
         @Test
         @DisplayName("Should use advanced retry strategies")
@@ -469,18 +447,7 @@ class PremiumBankAuthConfigurationTest {
     @DisplayName("Configuration Consistency Tests")
     class ConfigurationConsistencyTests {
 
-        @Test
-        @DisplayName("Required tokens should exist in token definitions")
-        void requiredTokensShouldExistInTokenDefinitions() {
-            // When
-            List<String> requiredTokens = config.getRequiredTokens();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
 
-            // Then
-            assertThat(definedTokens).containsAll(requiredTokens);
-        }
 
         @Test
         @DisplayName("Brand specific attempts should exist in token definitions")

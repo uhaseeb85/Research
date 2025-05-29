@@ -1,0 +1,42 @@
+[
+  {
+    "sessionId": "session-12345",
+    "dnis": "18001234567",
+    "sessionSsn": ["123456789", "987654321"],
+    "callerPhoneNumber": "+1234567890",
+    "previousApiCallId": "api-call-001",
+    "timestamp": 1703097600000
+  },
+  {
+    "sessionId": "session-67890",
+    "dnis": "18009876543",
+    "sessionSsn": ["555123456"],
+    "callerPhoneNumber": "+1987654321",
+    "previousApiCallId": "api-call-002",
+    "timestamp": 1703097660000
+  },
+  {
+    "sessionId": "session-11111",
+    "dnis": "18005551234",
+    "sessionSsn": ["123456789"],
+    "callerPhoneNumber": "+1555123456",
+    "previousApiCallId": "api-call-003",
+    "timestamp": 1703097720000
+  },
+  {
+    "sessionId": "session-22222",
+    "dnis": "18007778888",
+    "sessionSsn": ["987654321", "555123456"],
+    "callerPhoneNumber": "+1444555666",
+    "previousApiCallId": "api-call-004",
+    "timestamp": 1703097780000
+  },
+  {
+    "sessionId": "session-33333",
+    "dnis": "DEFAULT",
+    "sessionSsn": ["123456789"],
+    "callerPhoneNumber": "+1333444555",
+    "previousApiCallId": "api-call-005",
+    "timestamp": 1703097840000
+  }
+] 

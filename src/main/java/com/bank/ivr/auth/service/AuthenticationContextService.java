@@ -1,18 +1,5 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.AuthenticationSession;
-import com.bank.ivr.auth.model.domain.AttemptState;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.domain.TokenState;
-import com.bank.ivr.auth.model.request.AuthenticationRequest;
-import com.bank.ivr.auth.repository.AuthenticationContextRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,6 +7,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.bank.ivr.auth.model.domain.AttemptState;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.AuthenticationSession;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.domain.DnisConfiguration;
+import com.bank.ivr.auth.model.domain.TokenState;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
+import com.bank.ivr.auth.repository.AuthenticationContextRepository;
 
 /**
  * Service responsible for managing brand-aware authentication context creation and lifecycle.
@@ -54,9 +56,6 @@ public class AuthenticationContextService {
         // Determine eligible tokens with brand awareness
         List<String> eligibleTokens = eligibilityService.determineEligibleTokens(customerProfile, brand);
         
-        // Get brand-specific required tokens
-        List<String> requiredTokens = brandConfigService.getRequiredTokensForBrand(brand);
-        
         // Get brand-specific token definitions for attempt calculations
         List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
         Map<String, Integer> brandSpecificAttempts = brandConfigService.getBrandSpecificTokenAttempts(brand);
@@ -77,8 +76,8 @@ public class AuthenticationContextService {
         // Get brand-specific overall attempts limit
         int maxOverallAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
         
-        logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, RequiredTokens: {}, MaxOverallAttempts: {}", 
-                    brand, eligibleTokens, requiredTokens, maxOverallAttempts);
+        logger.debug("Brand-aware context created - Brand: {}, EligibleTokens: {}, MaxOverallAttempts: {}", 
+                    brand, eligibleTokens, maxOverallAttempts);
         
         // Create session information
         AuthenticationSession session = AuthenticationSession.builder()
@@ -93,7 +92,76 @@ public class AuthenticationContextService {
         TokenState tokenState = TokenState.builder()
                 .eligibleTokens(eligibleTokens)
                 .authenticatedTokens(new ArrayList<>())
-                .requiredTokensForFullAuth(new ArrayList<>(requiredTokens))
+                .failedTokens(new ArrayList<>())
+                .askedTokens(new ArrayList<>())
+                .build();
+        
+        // Create attempt state
+        AttemptState attemptState = AttemptState.builder()
+                .tokenAttemptsRemaining(tokenAttempts)
+                .overallAttemptsRemaining(maxOverallAttempts)
+                .currentStatus(com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus.PENDING_PRIMARY_TOKEN)
+                .build();
+        
+        return AuthenticationContext.builder()
+                .session(session)
+                .tokenState(tokenState)
+                .attemptState(attemptState)
+                .build();
+    }
+    
+    /**
+     * Creates the initial authentication context for a new attempt with full brand awareness and DNIS configuration.
+     */
+    public AuthenticationContext createInitialContextWithDnis(String attemptId, AuthenticationRequest request, 
+                                                            CustomerProfile customerProfile, DnisConfiguration dnisConfig) {
+        String brand = request.getBrand();
+        logger.debug("Creating brand-aware initial context with DNIS for attempt: {}, brand: {}, dnis: {}", 
+                    attemptId, brand, dnisConfig.getDnis());
+        
+        // Determine eligible tokens with brand awareness and DNIS configuration
+        List<String> eligibleTokens = eligibilityService.determineEligibleTokensWithDnis(customerProfile, brand, dnisConfig);
+        
+        // Get brand-specific token definitions for attempt calculations
+        List<AuthTokenDefinition> brandTokenDefinitions = brandConfigService.getTokenDefinitionsForBrand(brand);
+        Map<String, Integer> brandSpecificAttempts = brandConfigService.getBrandSpecificTokenAttempts(brand);
+        
+        // Initialize token attempts using brand-specific configurations and DNIS overrides
+        Map<String, Integer> tokenAttempts = new HashMap<>();
+        for (AuthTokenDefinition tokenDef : brandTokenDefinitions) {
+            if (eligibleTokens.contains(tokenDef.getName())) {
+                // Use brand-specific override if available, otherwise use token definition default
+                Integer attempts = brandSpecificAttempts.get(tokenDef.getName());
+                if (attempts == null) {
+                    attempts = tokenDef.getMaxAttempts();
+                }
+                tokenAttempts.put(tokenDef.getName(), attempts);
+            }
+        }
+        
+        // Use DNIS-specific max attempts if configured, otherwise use brand-specific
+        int maxOverallAttempts = dnisConfig.getMaxAuthenticationAttempts();
+        if (maxOverallAttempts <= 0) {
+            maxOverallAttempts = brandConfigService.getMaxOverallAttemptsForBrand(brand);
+        }
+        
+        logger.debug("DNIS-aware context created - Brand: {}, DNIS: {}, EligibleTokens: {}, MaxOverallAttempts: {}", 
+                    brand, dnisConfig.getDnis(), eligibleTokens, maxOverallAttempts);
+        
+        // Create session information with trust level info
+        AuthenticationSession session = AuthenticationSession.builder()
+                .attemptId(attemptId)
+                .sessionId(request.getSessionId())
+                .customerIdentifier(request.getCustomerIdentifier())
+                .brand(brand)
+                .startTime(LocalDateTime.now())
+                .trustLevelInfo(request.getTrustLevelInfo())
+                .build();
+        
+        // Create token state
+        TokenState tokenState = TokenState.builder()
+                .eligibleTokens(eligibleTokens)
+                .authenticatedTokens(new ArrayList<>())
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())
                 .build();

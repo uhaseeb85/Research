@@ -1,27 +1,33 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.model.request.CustomerIdentifier;
-import com.bank.ivr.auth.model.response.AuthenticationResponse;
-import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.lenient;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.model.request.CustomerIdentifier;
+import com.bank.ivr.auth.model.response.AuthenticationResponse;
+import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthenticationResponseService Tests")
@@ -33,9 +39,6 @@ class AuthenticationResponseServiceTest {
     @Mock
     private BrandAuthConfigurationService brandConfigService;
 
-    @Mock
-    private BrandFailurePolicyService failurePolicyService;
-
     @InjectMocks
     private AuthenticationResponseService authenticationResponseService;
 
@@ -45,29 +48,29 @@ class AuthenticationResponseServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Set up token definitions with priorities
-        AuthTokenDefinition ssnToken = AuthTokenDefinition.builder()
-                .name("SSN")
-                .description("Social Security Number")
-                .priority(100)
-                .maxAttempts(3)
-                .build();
-
-        AuthTokenDefinition pinToken = AuthTokenDefinition.builder()
-                .name("DEBIT_CARD_PIN")
-                .description("4-digit PIN")
-                .priority(90)
-                .maxAttempts(3)
-                .build();
-
-        AuthTokenDefinition dobToken = AuthTokenDefinition.builder()
-                .name("DATE_OF_BIRTH")
-                .description("Date of Birth")
-                .priority(80)
-                .maxAttempts(3)
-                .build();
-
-        tokenDefinitions = Arrays.asList(ssnToken, pinToken, dobToken);
+        // Set up token definitions
+        tokenDefinitions = Arrays.asList(
+            AuthTokenDefinition.builder()
+                    .name("SSN")
+                    .description("Social Security Number")
+                    .priority(100)
+                    .maxAttempts(3)
+                    .build(),
+            
+            AuthTokenDefinition.builder()
+                    .name("DEBIT_CARD_PIN")
+                    .description("4-digit PIN")
+                    .priority(90)
+                    .maxAttempts(3)
+                    .build(),
+            
+            AuthTokenDefinition.builder()
+                    .name("DATE_OF_BIRTH")
+                    .description("Date of Birth")
+                    .priority(80)
+                    .maxAttempts(3)
+                    .build()
+        );
 
         // Set up customer profile
         customerProfile = new CustomerProfile();
@@ -88,16 +91,10 @@ class AuthenticationResponseServiceTest {
                 .overallAttemptsRemaining(5)
                 .eligibleTokens(Arrays.asList("SSN", "DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
                 .authenticatedTokens(new ArrayList<>())
-                .requiredTokensForFullAuth(Arrays.asList("SSN", "DEBIT_CARD_PIN"))
                 .currentStatus(AuthStatus.PENDING_PRIMARY_TOKEN)
                 .failedTokens(new ArrayList<>())
                 .askedTokens(new ArrayList<>())
                 .build();
-        
-        // Set up brand failure policy service mocks (lenient to avoid unnecessary stubbing errors)
-        lenient().when(failurePolicyService.shouldFailAuthentication(any(), any(), any())).thenReturn(false);
-        lenient().when(failurePolicyService.getNextAlternativeToken(any(), any(), any())).thenReturn(null);
-        lenient().when(failurePolicyService.isPartialAuthenticationAllowed(any(), any())).thenReturn(false);
     }
 
     @Test

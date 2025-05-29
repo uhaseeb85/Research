@@ -1,34 +1,49 @@
 package com.bank.ivr.auth.controller;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.ProvidedToken;
 import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
 import com.bank.ivr.auth.service.BrandAuthConfigurationService;
+import com.bank.ivr.auth.service.DnisConfigurationService;
+import com.bank.ivr.auth.service.SessionContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.*;
-
-import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthenticationController.class)
 @DisplayName("Brand-Aware Authentication Controller Tests")
@@ -42,6 +57,12 @@ class AuthenticationControllerTest {
     
     @MockBean
     private BrandAuthConfigurationService brandConfigService;
+    
+    @MockBean
+    private DnisConfigurationService dnisConfigService;
+
+    @MockBean
+    private SessionContextService sessionContextService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -83,14 +104,18 @@ class AuthenticationControllerTest {
         
         // Default brand configuration responses
         when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
-        when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+
         when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
         
         when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
-        when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+
         when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
         
         when(brandConfigService.getBrandMessage(any(), eq("failure"))).thenReturn("Authentication failed. Please try again or contact support.");
+        
+        // Setup default session context service mocks
+        when(sessionContextService.getDnisFromSession(any())).thenReturn(Optional.empty());
+        when(sessionContextService.getSessionSsnFromSession(any())).thenReturn(Optional.empty());
     }
     
     private TrustLevelInfo createDefaultTrustLevelInfo() {
@@ -120,7 +145,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("FAILED")))
                     .andExpect(jsonPath("$.message", containsString("Brand 'UNSUPPORTED_BRAND' is not supported")));
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -140,7 +165,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -153,7 +178,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -165,7 +190,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")));
 
             verify(brandConfigService).isBrandSupported("PREMIUM_BANK");
-            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class), any(), any());
         }
     }
 
@@ -183,7 +208,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -196,7 +221,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.status", is("PENDING_PRIMARY_TOKEN")))
                     .andExpect(jsonPath("$.message", containsString("PIN")));
 
-            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class));
+            verify(authenticationOrchestrator).authenticateCustomer(any(AuthenticationRequest.class), any(), any());
         }
 
         @Test
@@ -214,10 +239,10 @@ class AuthenticationControllerTest {
                     .status(AuthStatus.PENDING_MORE_TOKENS)
                     .message("Please also provide your date of birth for additional verification.")
                     .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN"))
-                    .requiredTokensRemaining(Arrays.asList("DATE_OF_BIRTH"))
+
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -228,13 +253,13 @@ class AuthenticationControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("PENDING_MORE_TOKENS")))
                     .andExpect(jsonPath("$.authenticatedTokens[0]", is("DEBIT_CARD_PIN")))
-                    .andExpect(jsonPath("$.requiredTokensRemaining[0]", is("DATE_OF_BIRTH")));
+;
         }
 
         @Test
         @DisplayName("Should complete Premium Bank authentication successfully")
         void shouldCompletePremiumBankAuthenticationSuccessfully() throws Exception {
-            // Given - Both required tokens provided
+            // Given - Both tokens provided
             List<ProvidedToken> tokens = Arrays.asList(
                     new ProvidedToken("DEBIT_CARD_PIN", "1234"),
                     new ProvidedToken("DATE_OF_BIRTH", "01/01/1990")
@@ -249,7 +274,7 @@ class AuthenticationControllerTest {
                     .authenticatedTokens(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"))
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -278,7 +303,7 @@ class AuthenticationControllerTest {
                     .message("Please provide the last 4 digits of your Social Security Number.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -309,7 +334,7 @@ class AuthenticationControllerTest {
                     .authenticatedTokens(Arrays.asList("SSN"))
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -349,7 +374,7 @@ class AuthenticationControllerTest {
             );
 
             when(brandConfigService.getTokenDefinitionsForBrand("PREMIUM_BANK")).thenReturn(premiumTokens);
-            when(brandConfigService.getRequiredTokensForBrand("PREMIUM_BANK")).thenReturn(Arrays.asList("DEBIT_CARD_PIN", "DATE_OF_BIRTH"));
+
             when(brandConfigService.getMaxOverallAttemptsForBrand("PREMIUM_BANK")).thenReturn(3);
             when(brandConfigService.isConcurrentTokenAuthAllowed("PREMIUM_BANK")).thenReturn(true);
 
@@ -361,7 +386,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
                     .andExpect(jsonPath("$.tokenDefinitions[0].name", is("DEBIT_CARD_PIN")))
                     .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
-                    .andExpect(jsonPath("$.requiredTokens", hasSize(2)))
+
                     .andExpect(jsonPath("$.maxOverallAttempts", is(3)))
                     .andExpect(jsonPath("$.concurrentAuthAllowed", is(true)));
         }
@@ -386,7 +411,7 @@ class AuthenticationControllerTest {
             );
 
             when(brandConfigService.getTokenDefinitionsForBrand("COMMUNITY_BANK")).thenReturn(communityTokens);
-            when(brandConfigService.getRequiredTokensForBrand("COMMUNITY_BANK")).thenReturn(Arrays.asList("SSN"));
+
             when(brandConfigService.getMaxOverallAttemptsForBrand("COMMUNITY_BANK")).thenReturn(5);
             when(brandConfigService.isConcurrentTokenAuthAllowed("COMMUNITY_BANK")).thenReturn(false);
 
@@ -398,7 +423,7 @@ class AuthenticationControllerTest {
                     .andExpect(jsonPath("$.tokenDefinitions", hasSize(2)))
                     .andExpect(jsonPath("$.tokenDefinitions[0].name", is("SSN")))
                     .andExpect(jsonPath("$.tokenDefinitions[0].priority", is(100)))
-                                          .andExpect(jsonPath("$.requiredTokens", hasSize(1)))                      .andExpect(jsonPath("$.requiredTokens[0]", is("SSN")))
+
                     .andExpect(jsonPath("$.maxOverallAttempts", is(5)))
                     .andExpect(jsonPath("$.concurrentAuthAllowed", is(false)));
         }
@@ -467,7 +492,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle IllegalArgumentException with brand context")
         void shouldHandleIllegalArgumentExceptionWithBrandContext() throws Exception {
             // Given
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenThrow(new IllegalArgumentException("Invalid token format"));
 
             when(brandConfigService.getBrandMessage("PREMIUM_BANK", "failure"))
@@ -489,7 +514,7 @@ class AuthenticationControllerTest {
         @DisplayName("Should handle unexpected exceptions with brand context")
         void shouldHandleUnexpectedExceptionsWithBrandContext() throws Exception {
             // Given
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenThrow(new RuntimeException("Database connection failed"));
 
             when(brandConfigService.getBrandMessage("COMMUNITY_BANK", "failure"))
@@ -521,7 +546,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -553,7 +578,7 @@ class AuthenticationControllerTest {
                     .andDo(print())
                     .andExpect(status().isBadRequest());
 
-            verify(authenticationOrchestrator, never()).authenticateCustomer(any());
+            verify(authenticationOrchestrator, never()).authenticateCustomer(any(), any(), any());
         }
 
         @Test
@@ -573,7 +598,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -596,7 +621,7 @@ class AuthenticationControllerTest {
             mockMvc.perform(get("/api/v1/auth/health"))
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(content().string("IVR Authentication Service is healthy (Brand-aware)"));
+                    .andExpect(content().string("IVR Authentication Service is healthy (Brand-aware with DNIS support)"));
         }
 
         @Test
@@ -641,7 +666,7 @@ class AuthenticationControllerTest {
                     .message("Please provide your 4-digit PIN.")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then
@@ -669,7 +694,7 @@ class AuthenticationControllerTest {
                     .message("Invalid token type for Premium Bank")
                     .build();
 
-            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class)))
+            when(authenticationOrchestrator.authenticateCustomer(any(AuthenticationRequest.class), any(), any()))
                     .thenReturn(mockResponse);
 
             // When & Then

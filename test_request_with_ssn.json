@@ -1,0 +1,21 @@
+{
+  "sessionId": "session-12345",
+  "customerIdentifier": {
+    "type": "PHONE_NUMBER",
+    "value": "+1234567890"
+  },
+  "attemptId": "d3989a77-3df6-44b5-8f49-d8ddf6d0aaba",
+  "providedTokens": [
+    {
+      "tokenName": "SSN",
+      "tokenValue": "123-45-6789"
+    }
+  ],
+  "brand": "PREMIUM_BANK",
+  "trustLevelInfo": {
+    "trustLevel": "GREEN",
+    "phoneMatchStatus": "SINGLE_MATCH",
+    "matchedSsnCount": 1
+  },
+  "newAttempt": false
+} 

@@ -1,20 +1,20 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.config.BrandAuthConfiguration;
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
-import com.bank.ivr.auth.model.domain.BrandFailurePolicy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.bank.ivr.auth.config.BrandAuthConfiguration;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
+import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 
 /**
  * Service for managing brand-specific authentication configurations.
@@ -119,19 +119,7 @@ public class BrandAuthConfigurationService {
         return definitions;
     }
     
-    /**
-     * Gets required tokens for a specific brand.
-     * 
-     * @param brandCode the brand code
-     * @return list of required token names
-     */
-    public List<String> getRequiredTokensForBrand(String brandCode) {
-        BrandAuthConfiguration config = getBrandConfiguration(brandCode);
-        if (config == null) {
-            return Collections.emptyList();
-        }
-        return config.getRequiredTokens();
-    }
+
     
     /**
      * Gets maximum overall attempts for a specific brand.
@@ -245,25 +233,6 @@ public class BrandAuthConfigurationService {
                     .build();
         }
         return config.getGlobalRetryPolicy();
-    }
-    
-    /**
-     * Gets the brand-specific failure policy.
-     * 
-     * @param brandCode the brand code
-     * @return the brand failure policy
-     */
-    public BrandFailurePolicy getBrandFailurePolicy(String brandCode) {
-        BrandAuthConfiguration config = getBrandConfiguration(brandCode);
-        if (config == null) {
-            // Return default policy
-            return BrandFailurePolicy.builder()
-                    .brandCode(brandCode)
-                    .failureStrategy(BrandFailurePolicy.FailureStrategy.ALLOW_ALTERNATIVES)
-                    .alternativeTokenStrategy(BrandFailurePolicy.AlternativeTokenStrategy.PRIORITY_BASED)
-                    .build();
-        }
-        return config.getBrandFailurePolicy();
     }
     
     /**

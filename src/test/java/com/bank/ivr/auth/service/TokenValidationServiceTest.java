@@ -1,17 +1,20 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.validator.TokenValidator;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
-import java.time.LocalDate;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import static org.mockito.Mockito.when;
+import org.mockito.MockitoAnnotations;
+
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.validator.TokenValidator;
 
 /**
  * Test class for TokenValidationService focusing on brand-aware validation
@@ -27,6 +30,9 @@ class TokenValidationServiceTest {
     
     @Mock
     private TokenValidator duplicateCommunityBankSsnValidator;
+    
+    @Mock
+    private PostValidationRuleService postValidationRuleService;
     
     private CustomerProfile testProfile;
     
@@ -60,7 +66,7 @@ class TokenValidationServiceTest {
         List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
         
         // When: Creating TokenValidationService
-        TokenValidationService service = new TokenValidationService(validators);
+        TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // Then: Should succeed without throwing exception
         assertTrue(service.hasValidator("DEFAULT", "SSN"));
@@ -75,7 +81,7 @@ class TokenValidationServiceTest {
         
         // When & Then: Should throw IllegalStateException
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            new TokenValidationService(validators);
+            new TokenValidationService(validators, postValidationRuleService);
         });
         
         assertTrue(exception.getMessage().contains("Multiple validators found for brand 'COMMUNITY_BANK' and token 'SSN'"));
@@ -86,7 +92,7 @@ class TokenValidationServiceTest {
     void shouldReturnCorrectValidatorForBrandTokenCombination() {
         // Given: Validators for different brands
         List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
-        TokenValidationService service = new TokenValidationService(validators);
+        TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return correct validators for each brand
         assertEquals(defaultSsnValidator, service.getValidator("DEFAULT", "SSN"));
@@ -98,7 +104,7 @@ class TokenValidationServiceTest {
     void shouldReturnBrandSpecificTokenNames() {
         // Given: Validators for different brands
         List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
-        TokenValidationService service = new TokenValidationService(validators);
+        TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return token names for specific brands
         assertTrue(service.getSupportedTokenNamesForBrand("DEFAULT").contains("SSN"));
@@ -113,7 +119,7 @@ class TokenValidationServiceTest {
         when(communityBankSsnValidator.validate("customer1", "123456789", testProfile)).thenReturn(false);
         
         List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
-        TokenValidationService service = new TokenValidationService(validators);
+        TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Different brands should use different validators
         assertTrue(service.validateToken("SSN", "DEFAULT", "customer1", "123456789", testProfile));
@@ -124,7 +130,7 @@ class TokenValidationServiceTest {
     void shouldReturnBrandTokenCombinations() {
         // Given: Validators for different brands
         List<TokenValidator> validators = List.of(defaultSsnValidator, communityBankSsnValidator);
-        TokenValidationService service = new TokenValidationService(validators);
+        TokenValidationService service = new TokenValidationService(validators, postValidationRuleService);
         
         // When & Then: Should return all brand+token combinations
         var combinations = service.getSupportedBrandTokenCombinations();

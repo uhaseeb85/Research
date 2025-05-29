@@ -61,11 +61,7 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Premium Bank requires SSN and one additional factor
-        return Arrays.asList("SSN", "DEBIT_CARD_PIN");
-    }
+
     
     @Override
     public int getMaxOverallAttempts() {
@@ -78,7 +74,7 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
 
 - **Priority**: Higher numbers = asked first (100 > 90 > 80)
 - **MaxAttempts**: How many times a token can fail before being marked as failed
-- **Required Tokens**: Tokens that must be authenticated for full authentication
+- **Token Priorities**: Higher priority tokens are asked first
 - **Brand-Specific Limits**: Override default attempt limits per brand
 
 ---
@@ -95,8 +91,8 @@ Defines what happens when tokens fail and how to select alternative tokens.
 
 ```java
 public enum FailureStrategy {
-    FAIL_IMMEDIATELY,           // Fail as soon as any required token fails
-    ALLOW_ALTERNATIVES,         // Try alternative tokens when required tokens fail
+    FAIL_IMMEDIATELY,           // Fail as soon as any critical token fails
+    ALLOW_ALTERNATIVES,         // Try alternative tokens when critical tokens fail
     REQUIRE_ALL_ATTEMPTED,      // Only fail after all eligible tokens have been tried
     PROGRESSIVE_FALLBACK        // Use fallback token groups in order
 }
@@ -266,7 +262,7 @@ PremiumBankAuthConfiguration:
 BrandFailurePolicy:
 - Strategy: ALLOW_ALTERNATIVES
 - Alternative Strategy: PRIORITY_BASED
-- Required Tokens: ["SSN", "DEBIT_CARD_PIN"]
+- Critical Tokens: ["SSN", "DEBIT_CARD_PIN"]
 ```
 
 #### Authentication Flow
@@ -286,14 +282,14 @@ BrandFailurePolicy:
 
 ✅ Step 3: User provides correct PIN
    → PIN authenticated successfully
-   → System needs one more required token
+   → System continues with additional authentication
    → SSN cannot be re-asked (smart re-asking logic)
    → System asks for DATE_OF_BIRTH (next available priority: 80)
    → Message: "Please provide your Date of Birth"
 
 ✅ Step 4: User provides correct DOB
    → DOB authenticated successfully
-   → Required tokens satisfied: PIN ✅, DOB ✅ (SSN failed but alternatives worked)
+   → Authentication satisfied: PIN ✅, DOB ✅ (SSN failed but alternatives worked)
    → Authentication successful!
 
 Alternative Scenario:
@@ -350,11 +346,7 @@ public class TechBankAuthConfiguration implements BrandAuthConfiguration {
         );
     }
     
-    @Override
-    public List<String> getRequiredTokens() {
-        // Tech Bank requires biometric and one additional factor
-        return Arrays.asList("BIOMETRIC", "MOBILE_PIN");
-    }
+
     
     @Override
     public BrandFailurePolicy getBrandFailurePolicy() {
