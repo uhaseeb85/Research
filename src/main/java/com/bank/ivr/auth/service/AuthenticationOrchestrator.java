@@ -118,7 +118,7 @@ public class AuthenticationOrchestrator {
         // Enhanced customer lookup using session SSN if available
         Optional<CustomerProfile> customerProfileOpt = findCustomerWithContext(request, sessionSsnList);
         
-        if (customerProfileOpt.isEmpty()) {
+        if (!customerProfileOpt.isPresent()) {
             logger.warn("Customer not found for identifier: {}, brand: {}, sessionSsnCount: {}", 
                        request.getCustomerIdentifier(), brand, sessionSsnList != null ? sessionSsnList.size() : 0);
             
@@ -160,7 +160,7 @@ public class AuthenticationOrchestrator {
         // Retrieve existing context
         Optional<AuthenticationContext> contextOpt = contextService.getContextByAttemptId(request.getAttemptId());
         
-        if (contextOpt.isEmpty()) {
+        if (!contextOpt.isPresent()) {
             logger.warn("Authentication context not found for attempt: {}, brand: {}", 
                        request.getAttemptId(), brand);
             
@@ -193,7 +193,7 @@ public class AuthenticationOrchestrator {
         // Retrieve customer profile
         Optional<CustomerProfile> customerProfileOpt = customerProfileRepository.findByCustomerIdentifier(request.getCustomerIdentifier());
         
-        if (customerProfileOpt.isEmpty()) {
+        if (!customerProfileOpt.isPresent()) {
             logger.error("Customer profile missing during continuing authentication for attempt: {}", request.getAttemptId());
             return AuthenticationResponse.builder()
                     .attemptId(request.getAttemptId())
