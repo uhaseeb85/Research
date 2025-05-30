@@ -17,83 +17,63 @@ import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 @Component
 public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     
-    @Override
-    public String getBrandCode() {
-        return "COMMUNITY_BANK";
-    }
+    private static final List<AuthTokenDefinition> TOKEN_DEFINITIONS = Arrays.asList(
+        // Community bank prioritizes SSN for primary authentication (traditional approach)
+        AuthTokenDefinition.builder()
+                .name("SSN")
+                .description("Social Security Number")
+                .priority(100) // Highest priority for community bank
+                .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
+                .maxAttempts(3)
+                .build(),
+        
+        AuthTokenDefinition.builder()
+                .name("DATE_OF_BIRTH")
+                .description("Date of Birth")
+                .priority(95)
+                .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
+                .maxAttempts(3)
+                .build(),
+        
+        AuthTokenDefinition.builder()
+                .name("MOTHER_MAIDEN_NAME")
+                .description("Mother's Maiden Name")
+                .priority(90)
+                .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
+                .maxAttempts(3)
+                .build(),
+        
+        AuthTokenDefinition.builder()
+                .name("DEBIT_CARD_PIN")
+                .description("Debit Card PIN")
+                .priority(85) // Lower priority for community bank
+                .inputFormatRegex("^\\d{4}$")
+                .maxAttempts(3)
+                .build(),
+        
+        // Community-specific: Account opening date
+        AuthTokenDefinition.builder()
+                .name("ACCOUNT_OPENING_DATE")
+                .description("Account Opening Date")
+                .priority(80)
+                .inputFormatRegex("^\\d{2}/\\d{4}$")
+                .maxAttempts(3)
+                .build()
+    );
     
-    @Override
-    public List<AuthTokenDefinition> getTokenDefinitions() {
-        return Arrays.asList(
-            // Community bank prioritizes SSN for primary authentication (traditional approach)
-            AuthTokenDefinition.builder()
-                    .name("SSN")
-                    .description("Social Security Number")
-                    .priority(100) // Highest priority for community bank
-                    .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
-                    .maxAttempts(3)
-                    .build(),
-            
-            AuthTokenDefinition.builder()
-                    .name("DATE_OF_BIRTH")
-                    .description("Date of Birth")
-                    .priority(95)
-                    .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
-                    .maxAttempts(3)
-                    .build(),
-            
-            AuthTokenDefinition.builder()
-                    .name("MOTHER_MAIDEN_NAME")
-                    .description("Mother's Maiden Name")
-                    .priority(90)
-                    .inputFormatRegex("^[a-zA-Z\\s'-]{2,50}$")
-                    .maxAttempts(3)
-                    .build(),
-            
-            AuthTokenDefinition.builder()
-                    .name("DEBIT_CARD_PIN")
-                    .description("Debit Card PIN")
-                    .priority(85) // Lower priority for community bank
-                    .inputFormatRegex("^\\d{4}$")
-                    .maxAttempts(3)
-                    .build(),
-            
-            // Community-specific: Account opening date
-            AuthTokenDefinition.builder()
-                    .name("ACCOUNT_OPENING_DATE")
-                    .description("Account Opening Date")
-                    .priority(80)
-                    .inputFormatRegex("^\\d{2}/\\d{4}$")
-                    .maxAttempts(3)
-                    .build()
-        );
-    }
-    
-
-    
-    @Override
-    public int getMaxOverallAttempts() {
-        return 5; // More lenient overall attempts
-    }
-    
-    @Override
-    public Map<String, Integer> getBrandSpecificTokenAttempts() {
+    private static final Map<String, Integer> BRAND_SPECIFIC_TOKEN_ATTEMPTS;
+    static {
         Map<String, Integer> attempts = new HashMap<>();
         attempts.put("SSN", 3);
         attempts.put("DATE_OF_BIRTH", 3);
         attempts.put("MOTHER_MAIDEN_NAME", 3);
         attempts.put("DEBIT_CARD_PIN", 3);
         attempts.put("ACCOUNT_OPENING_DATE", 3);
-        return attempts;
+        BRAND_SPECIFIC_TOKEN_ATTEMPTS = attempts;
     }
     
-    @Override
-    public boolean isConcurrentTokenAuthAllowed() {
-        return false; // Community bank prefers step-by-step authentication
-    }
-    
-    @Override
-    public Map<String, String> getBrandMessages() {
+    private static final Map<String, String> BRAND_MESSAGES;
+    static {
         Map<String, String> messages = new HashMap<>();
         messages.put("welcome", "Welcome to Community Bank! We're here to help verify your identity.");
         messages.put("primary_prompt", "Please provide your {token_description} to continue.");
@@ -104,7 +84,37 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
         messages.put("session_expired", "Your session has timed out. Please start over to verify your identity.");
         messages.put("system_error", "We're experiencing technical difficulties. Please try again or visit your local branch.");
         messages.put("no_methods", "No verification methods available. Please visit your local Community Bank branch for assistance.");
-        return messages;
+        BRAND_MESSAGES = messages;
+    }
+    
+    @Override
+    public String getBrandCode() {
+        return "COMMUNITY_BANK";
+    }
+    
+    @Override
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return TOKEN_DEFINITIONS;
+    }
+    
+    @Override
+    public int getMaxOverallAttempts() {
+        return 5; // More lenient overall attempts
+    }
+    
+    @Override
+    public Map<String, Integer> getBrandSpecificTokenAttempts() {
+        return BRAND_SPECIFIC_TOKEN_ATTEMPTS;
+    }
+    
+    @Override
+    public boolean isConcurrentTokenAuthAllowed() {
+        return false; // Community bank prefers step-by-step authentication
+    }
+    
+    @Override
+    public Map<String, String> getBrandMessages() {
+        return BRAND_MESSAGES;
     }
     
     @Override

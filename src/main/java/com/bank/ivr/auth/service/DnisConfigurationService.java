@@ -1,8 +1,14 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.DnisConfiguration;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,12 +16,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.bank.ivr.auth.model.domain.DnisConfiguration;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Service for managing DNIS (Dialed Number Identification Service) configurations.
@@ -25,6 +28,18 @@ import java.util.Map;
 public class DnisConfigurationService {
     
     private static final Logger logger = LoggerFactory.getLogger(DnisConfigurationService.class);
+    
+    private static final Map<String, Function<DnisConfiguration, Boolean>> TOKEN_VALIDATORS;
+    static {
+        Map<String, Function<DnisConfiguration, Boolean>> validators = new HashMap<>();
+        validators.put("SSN", DnisConfiguration::isAllowSsnAuthentication);
+        validators.put("DEBIT_CARD_PIN", DnisConfiguration::isAllowPinAuthentication);
+        validators.put("PIN", DnisConfiguration::isAllowPinAuthentication);
+        validators.put("DATE_OF_BIRTH", DnisConfiguration::isAllowDateOfBirthAuthentication);
+        validators.put("MOTHER_MAIDEN_NAME", DnisConfiguration::isAllowMotherMaidenNameAuthentication);
+        validators.put("ACCOUNT_NUMBER", DnisConfiguration::isAllowAccountNumberAuthentication);
+        TOKEN_VALIDATORS = validators;
+    }
     
     private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper;
@@ -159,21 +174,12 @@ public class DnisConfigurationService {
     public boolean isTokenAllowedForDnis(String dnis, String tokenName) {
         DnisConfiguration config = getDnisConfiguration(dnis);
         
-        switch (tokenName.toUpperCase()) {
-            case "SSN":
-                return config.isAllowSsnAuthentication();
-            case "DEBIT_CARD_PIN":
-            case "PIN":
-                return config.isAllowPinAuthentication();
-            case "DATE_OF_BIRTH":
-                return config.isAllowDateOfBirthAuthentication();
-            case "MOTHER_MAIDEN_NAME":
-                return config.isAllowMotherMaidenNameAuthentication();
-            case "ACCOUNT_NUMBER":
-                return config.isAllowAccountNumberAuthentication();
-            default:
-                return true; // Allow unknown tokens by default
+        Function<DnisConfiguration, Boolean> validator = TOKEN_VALIDATORS.get(tokenName.toUpperCase());
+        if (validator != null) {
+            return validator.apply(config);
         }
+        
+        return true; // Allow unknown tokens by default
     }
     
     /**
