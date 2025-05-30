@@ -1,11 +1,11 @@
 package com.bank.ivr.auth.model.domain;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Manages the attempt-related state during authentication.
@@ -22,24 +22,14 @@ public class AttemptState {
     @JsonProperty("currentStatus")
     private AuthStatus currentStatus;
     
-    @JsonProperty("tokenRetryStates")
-    private Map<String, TokenRetryState> tokenRetryStates;
-    
-    @JsonProperty("globalRetryState")
-    private GlobalRetryState globalRetryState;
-    
     @JsonCreator
     public AttemptState(
             @JsonProperty("tokenAttemptsRemaining") Map<String, Integer> tokenAttemptsRemaining,
             @JsonProperty("overallAttemptsRemaining") int overallAttemptsRemaining,
-            @JsonProperty("currentStatus") AuthStatus currentStatus,
-            @JsonProperty("tokenRetryStates") Map<String, TokenRetryState> tokenRetryStates,
-            @JsonProperty("globalRetryState") GlobalRetryState globalRetryState) {
+            @JsonProperty("currentStatus") AuthStatus currentStatus) {
         this.tokenAttemptsRemaining = tokenAttemptsRemaining != null ? tokenAttemptsRemaining : new HashMap<>();
         this.overallAttemptsRemaining = overallAttemptsRemaining;
         this.currentStatus = currentStatus;
-        this.tokenRetryStates = tokenRetryStates;
-        this.globalRetryState = globalRetryState;
     }
     
     // Getters
@@ -55,14 +45,6 @@ public class AttemptState {
         return currentStatus;
     }
     
-    public Map<String, TokenRetryState> getTokenRetryStates() {
-        return tokenRetryStates;
-    }
-    
-    public GlobalRetryState getGlobalRetryState() {
-        return globalRetryState;
-    }
-    
     // Setters for mutable operations
     public void setTokenAttemptsRemaining(Map<String, Integer> tokenAttemptsRemaining) {
         this.tokenAttemptsRemaining = tokenAttemptsRemaining;
@@ -74,14 +56,6 @@ public class AttemptState {
     
     public void setCurrentStatus(AuthStatus currentStatus) {
         this.currentStatus = currentStatus;
-    }
-    
-    public void setTokenRetryStates(Map<String, TokenRetryState> tokenRetryStates) {
-        this.tokenRetryStates = tokenRetryStates;
-    }
-    
-    public void setGlobalRetryState(GlobalRetryState globalRetryState) {
-        this.globalRetryState = globalRetryState;
     }
     
     // Business logic methods
@@ -115,8 +89,6 @@ public class AttemptState {
         private Map<String, Integer> tokenAttemptsRemaining = new HashMap<>();
         private int overallAttemptsRemaining = 5; // default
         private AuthStatus currentStatus = AuthStatus.PENDING_PRIMARY_TOKEN;
-        private Map<String, TokenRetryState> tokenRetryStates;
-        private GlobalRetryState globalRetryState;
         
         public Builder tokenAttemptsRemaining(Map<String, Integer> tokenAttemptsRemaining) {
             this.tokenAttemptsRemaining = tokenAttemptsRemaining;
@@ -133,19 +105,8 @@ public class AttemptState {
             return this;
         }
         
-        public Builder tokenRetryStates(Map<String, TokenRetryState> tokenRetryStates) {
-            this.tokenRetryStates = tokenRetryStates;
-            return this;
-        }
-        
-        public Builder globalRetryState(GlobalRetryState globalRetryState) {
-            this.globalRetryState = globalRetryState;
-            return this;
-        }
-        
         public AttemptState build() {
-            return new AttemptState(tokenAttemptsRemaining, overallAttemptsRemaining, 
-                    currentStatus, tokenRetryStates, globalRetryState);
+            return new AttemptState(tokenAttemptsRemaining, overallAttemptsRemaining, currentStatus);
         }
     }
 } 

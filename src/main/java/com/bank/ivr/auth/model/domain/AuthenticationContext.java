@@ -1,14 +1,14 @@
 package com.bank.ivr.auth.model.domain;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
 import com.bank.ivr.auth.model.request.CustomerIdentifier;
 import com.bank.ivr.auth.model.request.TrustLevelInfo;
 import com.bank.ivr.auth.model.response.AuthenticationResponse.AuthStatus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Simplified AuthenticationContext that delegates to specialized state classes.
@@ -100,14 +100,6 @@ public class AuthenticationContext {
         return attemptState.getCurrentStatus();
     }
     
-    public Map<String, TokenRetryState> getTokenRetryStates() {
-        return attemptState.getTokenRetryStates();
-    }
-    
-    public GlobalRetryState getGlobalRetryState() {
-        return attemptState.getGlobalRetryState();
-    }
-    
     // Delegate setters to tokenState
     public void setEligibleTokens(List<String> eligibleTokens) {
         tokenState.setEligibleTokens(eligibleTokens);
@@ -146,14 +138,6 @@ public class AuthenticationContext {
     
     public void setCurrentStatus(AuthStatus currentStatus) {
         attemptState.setCurrentStatus(currentStatus);
-    }
-    
-    public void setTokenRetryStates(Map<String, TokenRetryState> tokenRetryStates) {
-        attemptState.setTokenRetryStates(tokenRetryStates);
-    }
-    
-    public void setGlobalRetryState(GlobalRetryState globalRetryState) {
-        attemptState.setGlobalRetryState(globalRetryState);
     }
     
     // Delegate business logic methods to tokenState

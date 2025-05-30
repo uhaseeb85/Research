@@ -1,6 +1,6 @@
 # Bank IVR Authentication System - Complete Guide
 
-A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 3.1.0. Features brand-aware authentication, DNIS support, advanced retry management, trust-based authentication, and comprehensive security controls.
+A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 3.1.0. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
 
 ## 🚀 Overview
 
@@ -16,13 +16,7 @@ This system provides secure, stateful authentication for bank customers through 
 - **Trust Level Integration**: Phone match validation and trust-based authentication decisions
 - **Context Integration**: Session-based data retrieval with DNIS and SSN from previous API calls
 
-### Advanced Security & Retry Management
-- **Token-Level Retry Strategies**: Configurable retry patterns (immediate, fixed delay, exponential backoff, linear backoff)
-- **Brand-Level Retry Policies**: Global retry policies controlling overall retry behavior across tokens
-- **Progressive Lockout**: Increasing lockout periods after repeated failures with escalation policies
-- **Cross-Token Delay**: Failed attempts on one token introduce delays for subsequent attempts
-- **Suspicious Activity Detection**: Rapid successive failures trigger enhanced security measures
-- **Time-Based Retry Windows**: Automatic reset of retry counters after configurable periods
+### Advanced Security Features
 - **Post-Validation Rules**: Additional security checks after successful token validation
 - **Failed Token Tracking**: Smart re-asking logic prevents repeated requests for failed tokens
 
@@ -55,9 +49,7 @@ This system provides secure, stateful authentication for bank customers through 
    - `TokenValidationService`: Token validation management with brand-specific validators
    - `BrandAuthConfigurationService`: Brand-specific configuration management
    - `DnisConfigurationService`: DNIS-based routing and configuration
-   - `TokenRetryManagementService`: Advanced retry logic and lockout management
    - `PostValidationRuleService`: Additional security rules after token validation
-   - `BrandFailurePolicyService`: Brand-specific failure handling policies
    - `SessionContextService`: Session context data management
    - `TokenSelectionService`: Rule-based token selection logic
 
@@ -179,8 +171,6 @@ The system supports multiple brands with distinct configurations:
 - Maximum overall attempt limits
 - Concurrent token authentication settings
 - Brand-specific customer messages
-- Failure handling policies
-- Retry strategies and lockout policies
 - Trust-level based authentication rules
 
 ## 📞 DNIS Support
@@ -235,14 +225,14 @@ The system supports sophisticated trust-based authentication with conditional lo
 #### Trust Level Example Scenarios
 
 **Royal Bank Trust Matrix:**
-| Trust Level | Phone Match Status | Initial Token | Failure Escalation |
-|-------------|-------------------|---------------|-------------------|
-| GREEN | NOT_MATCHED | SSN_LAST_4 | → SSN_FULL |
-| GREEN | SINGLE_MATCH | SSN_LAST_4 | → SSN_FULL |
-| GREEN | MULTIPLE_MATCHES | SSN_LAST_4 | → SSN_FULL |
-| RED | NOT_MATCHED | SSN_FULL | → FAIL |
-| RED | SINGLE_MATCH | SSN_FULL | → FAIL |
-| RED | MULTIPLE_MATCHES | SSN_FULL | → FAIL |
+| Trust Level | Phone Match Status | Initial Token |
+|-------------|-------------------|---------------|
+| GREEN | NOT_MATCHED | SSN_LAST_4 |
+| GREEN | SINGLE_MATCH | SSN_LAST_4 |
+| GREEN | MULTIPLE_MATCHES | SSN_LAST_4 |
+| RED | NOT_MATCHED | SSN_FULL |
+| RED | SINGLE_MATCH | SSN_FULL |
+| RED | MULTIPLE_MATCHES | SSN_FULL |
 
 ## 🔄 Rule-Based System
 
@@ -256,7 +246,7 @@ The system supports sophisticated trust-based authentication with conditional lo
 #### 2. Token Selection Rules
 - **Purpose**: Decide the specific token to request based on complex business logic
 - **When**: Called during response building (every time we need to ask for a token)
-- **Examples**: Trust-based selection, brand-specific preferences, failure escalation
+- **Examples**: Trust-based selection, brand-specific preferences
 
 ### Rule Execution Sequence
 
@@ -270,11 +260,6 @@ The system supports sophisticated trust-based authentication with conditional lo
 2. TokenSelectionService determines next token
 3. Rules evaluated BY PRIORITY (highest first)
 4. First applicable rule wins
-
-#### Phase 3: Failure Handling
-1. Token validation fails
-2. Token selection rules evaluated for escalation
-3. Fallback to brand failure policies if no rules handle it
 
 ### Adding New Rules
 
@@ -389,7 +374,6 @@ The system comes pre-loaded with comprehensive test data:
 - Brand-specific authentication flows
 - DNIS-based routing scenarios
 - Failed token demonstration
-- Retry management testing
 - Trust level validation
 - Context-based authentication
 
@@ -488,15 +472,13 @@ curl -X POST http://localhost:8080/api/v1/auth/customer \
 6. **Token Selection**: Rule-based system determines which token to ask for
 7. **Token Validation**: Customer provides token value, system validates against stored data
 8. **Post-Validation Rules**: Additional security checks based on trust level and context
-9. **Retry Management**: Failed attempts trigger retry logic and potential lockouts
-10. **Completion Check**: System evaluates if authentication requirements are met
-11. **Result**: Authentication succeeds, fails, or continues with additional token requests
+9. **Completion Check**: System evaluates if authentication requirements are met
+10. **Result**: Authentication succeeds, fails, or continues with additional token requests
 
 ## 🛡️ Security Features
 
 - **Encrypted Storage**: Sensitive data (PINs) stored using BCrypt hashing
 - **Advanced Attempt Limiting**: Per-token, per-brand, and overall attempt limits
-- **Progressive Lockout**: Escalating lockout periods with suspicious activity detection
 - **Session Management**: Automatic session expiration and cleanup
 - **Input Validation**: Comprehensive validation of all inputs with brand context
 - **Audit Logging**: Detailed logging for security monitoring and compliance
@@ -513,7 +495,6 @@ curl -X POST http://localhost:8080/api/v1/auth/customer \
 - **Integration Tests**: Controller layer with MockMvc
 - **Brand-Specific Tests**: Authentication flows for each brand
 - **DNIS Tests**: DNIS configuration and routing
-- **Retry Management Tests**: Advanced retry logic and lockout scenarios
 - **Security Tests**: Failed token handling and suspicious activity detection
 - **Rule Tests**: Eligibility and token selection rule validation
 - **Trust-Based Tests**: Trust level and phone match scenario validation
@@ -525,7 +506,6 @@ curl -X POST http://localhost:8080/api/v1/auth/customer \
 - Brand configuration tests
 - DNIS configuration tests
 - Failed token demonstration tests
-- Retry management tests
 - Context integration tests
 - Trust-based authentication tests
 
@@ -599,11 +579,10 @@ src/
 
 ### Key Design Patterns
 - **Builder Pattern**: Complex object creation (requests, responses)
-- **Strategy Pattern**: Token validation, retry strategies, and business rules
+- **Strategy Pattern**: Token validation and business rules
 - **Repository Pattern**: Data access abstraction with in-memory/JSON implementation
 - **Service Layer**: Business logic encapsulation with clear separation of concerns
 - **Factory Pattern**: Brand and DNIS configuration creation
-- **Observer Pattern**: Event-driven retry management and security monitoring
 - **Rule Pattern**: Extensible rule-based system for eligibility and token selection
 
 ## 🏦 Bank Onboarding Guide
@@ -624,7 +603,6 @@ Token Priorities:
 
 Security Policies:
   - Max Overall Attempts: 5
-  - Progressive Lockout: Enabled
   - Multi-Factor Preferred: Yes
 
 Trust Level Rules:
@@ -726,7 +704,6 @@ Create comprehensive tests for your brand:
 ### Version 2.0 - Major Release
 - ✅ DNIS support with phone number-based routing
 - ✅ Brand-aware authentication with comprehensive configuration
-- ✅ Advanced retry management with progressive lockout
 - ✅ Trust level integration and phone match validation
 - ✅ Failed token tracking with smart re-asking logic
 - ✅ Post-validation security rules
@@ -739,7 +716,7 @@ Create comprehensive tests for your brand:
 
 ### Architecture Improvements
 - **Enhanced Request Model**: Support for trust level info and session context
-- **Service Layer Expansion**: New services for DNIS, retry management, and rules
+- **Service Layer Expansion**: New services for DNIS and rules
 - **Comprehensive API**: Brand-specific endpoints, DNIS configuration, and health checks
 - **Improved Code Quality**: Fixed all compilation issues and updated test expectations
 - **Rule System**: Extensible rule-based system for complex business logic
