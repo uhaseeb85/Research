@@ -5,14 +5,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.stereotype.Repository;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import com.bank.ivr.auth.model.domain.CustomerProfile;
 import com.bank.ivr.auth.repository.CustomerProfileRepository;
 import com.bank.ivr.auth.util.EncryptionUtil;
-
-import javax.annotation.PostConstruct;
 
 /**
  * In-memory implementation of CustomerProfileRepository.

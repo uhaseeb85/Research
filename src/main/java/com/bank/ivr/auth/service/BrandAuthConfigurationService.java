@@ -23,6 +23,21 @@ public class BrandAuthConfigurationService {
     
     private static final Logger logger = LoggerFactory.getLogger(BrandAuthConfigurationService.class);
     
+    private static final Map<String, String> DEFAULT_MESSAGES;
+    static {
+        Map<String, String> messages = new HashMap<>();
+        messages.put("welcome", "Welcome! Let's verify your identity.");
+        messages.put("primary_prompt", "Please provide your {token_description}.");
+        messages.put("secondary_prompt", "Thank you. Now please provide your {token_description}.");
+        messages.put("success", "Authentication successful.");
+        messages.put("failure", "Authentication failed. Please try again or contact support.");
+        messages.put("customer_not_found", "Customer not found. Please verify your information.");
+        messages.put("session_expired", "Authentication session expired. Please start over.");
+        messages.put("system_error", "An error occurred. Please try again.");
+        messages.put("no_methods", "No available authentication methods.");
+        DEFAULT_MESSAGES = messages;
+    }
+    
     private final Map<String, BrandAuthConfiguration> brandConfigurations;
     private final BrandAuthConfiguration defaultConfiguration;
     
@@ -209,27 +224,6 @@ public class BrandAuthConfigurationService {
      * @return default message
      */
     private String getDefaultMessage(String messageKey) {
-        switch (messageKey) {
-            case "welcome":
-                return "Welcome! Let's verify your identity.";
-            case "primary_prompt":
-                return "Please provide your {token_description}.";
-            case "secondary_prompt":
-                return "Thank you. Now please provide your {token_description}.";
-            case "success":
-                return "Authentication successful.";
-            case "failure":
-                return "Authentication failed. Please try again or contact support.";
-            case "customer_not_found":
-                return "Customer not found. Please verify your information.";
-            case "session_expired":
-                return "Authentication session expired. Please start over.";
-            case "system_error":
-                return "An error occurred. Please try again.";
-            case "no_methods":
-                return "No available authentication methods.";
-            default:
-                return "Please follow the authentication prompts.";
-        }
+        return DEFAULT_MESSAGES.getOrDefault(messageKey, "Please follow the authentication prompts.");
     }
 } 

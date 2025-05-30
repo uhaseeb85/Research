@@ -1,6 +1,6 @@
 # Bank IVR Authentication System - Complete Guide
 
-A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 3.1.0. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
+A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
 
 ## 🚀 Overview
 
@@ -21,7 +21,7 @@ This system provides secure, stateful authentication for bank customers through 
 - **Failed Token Tracking**: Smart re-asking logic prevents repeated requests for failed tokens
 
 ### Enterprise Features
-- **In-Memory Storage**: No database required - all data stored in Java collections with automatic initialization
+- **JSON-Based Storage**: Customer data loaded from JSON files with automatic initialization
 - **Stateful Session Management**: Session management with automatic expiration and context preservation
 - **Comprehensive Validation**: Input validation, attempt tracking, and security measures
 - **Production Ready**: Proper error handling, logging, monitoring, and health checks
@@ -39,8 +39,8 @@ This system provides secure, stateful authentication for bank customers through 
    - Trust level and phone match status tracking
 
 2. **Repository Layer**
-   - In-memory implementations using Java collections
-   - JSON-based data sources for session context and customer data
+   - JSON-based customer profile repository (primary)
+   - In-memory authentication context repository
    - No database dependencies
    - Automatic data initialization with test customers and DNIS configurations
 
@@ -236,7 +236,7 @@ The system supports sophisticated trust-based authentication with conditional lo
 
 ## 🔄 Rule-Based System
 
-### Two Rule Types
+### Three Rule Types
 
 #### 1. Eligibility Rules
 - **Purpose**: Determine which authentication methods are available to a customer
@@ -247,6 +247,11 @@ The system supports sophisticated trust-based authentication with conditional lo
 - **Purpose**: Decide the specific token to request based on complex business logic
 - **When**: Called during response building (every time we need to ask for a token)
 - **Examples**: Trust-based selection, brand-specific preferences
+
+#### 3. Post-Validation Rules
+- **Purpose**: Additional security checks after successful token validation
+- **When**: Called after each successful token validation
+- **Examples**: Trust level verification, phone match validation, risk assessment
 
 ### Rule Execution Sequence
 
@@ -260,6 +265,12 @@ The system supports sophisticated trust-based authentication with conditional lo
 2. TokenSelectionService determines next token
 3. Rules evaluated BY PRIORITY (highest first)
 4. First applicable rule wins
+
+#### Phase 3: Post-Validation (After Each Token)
+1. Token successfully validated
+2. PostValidationRuleService evaluates security rules
+3. Additional tokens may be required based on risk assessment
+4. Trust level and context evaluation
 
 ### Adding New Rules
 
@@ -305,6 +316,38 @@ public class TechBankMobileFirstRule implements TokenSelectionRule {
     @Override
     public int getPriority() {
         return 200;
+    }
+}
+```
+
+#### Example Post-Validation Rule
+```java
+@Component
+public class HighValueCustomerRule implements PostValidationRule {
+    @Override
+    public PostValidationResult evaluate(CustomerProfile customerProfile, String brand,
+                                       List<String> authenticatedTokens, 
+                                       TrustLevelInfo trustLevelInfo) {
+        if (customerProfile.getAccountBalance() > 100000 && 
+            authenticatedTokens.size() < 2) {
+            return PostValidationResult.builder()
+                .requireAdditionalAuth(true)
+                .requiredTokens(Arrays.asList("SSN_FULL", "DATE_OF_BIRTH"))
+                .riskLevel("HIGH")
+                .reason("High-value customer requires enhanced verification")
+                .build();
+        }
+        return PostValidationResult.noAdditionalAuth();
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "HIGH_VALUE_CUSTOMER_RULE";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 150;
     }
 }
 ```
@@ -380,7 +423,7 @@ The system comes pre-loaded with comprehensive test data:
 ## 🚀 Running the Application
 
 ### Prerequisites
-- Java 17 or higher
+- Java 8 or higher
 - Maven 3.6 or higher
 
 ### Build and Run
@@ -392,7 +435,7 @@ cd ivr
 # Build the application
 mvn clean compile
 
-# Run comprehensive test suite (170+ tests)
+# Run comprehensive test suite (135 tests)
 mvn test
 
 # Start the application
@@ -490,7 +533,7 @@ curl -X POST http://localhost:8080/api/v1/auth/customer \
 ## 🧪 Testing
 
 ### Comprehensive Test Suite
-- **170+ Tests**: Complete coverage of all functionality
+- **135 Tests**: Complete coverage of all functionality
 - **Unit Tests**: Service layer, validation, and business logic
 - **Integration Tests**: Controller layer with MockMvc
 - **Brand-Specific Tests**: Authentication flows for each brand
@@ -573,7 +616,7 @@ src/
 │   ├── sample-customer-data.json    # Customer data
 │   └── dnis-configurations.json     # DNIS configurations
 └── test/
-    ├── java/           # Comprehensive test classes (170+ tests)
+    ├── java/           # Comprehensive test classes (135 tests)
     └── resources/      # Test configuration and data
 ```
 
@@ -707,7 +750,7 @@ Create comprehensive tests for your brand:
 - ✅ Trust level integration and phone match validation
 - ✅ Failed token tracking with smart re-asking logic
 - ✅ Post-validation security rules
-- ✅ Comprehensive test suite (170+ tests)
+- ✅ Comprehensive test suite (135 tests)
 - ✅ Enhanced error handling and logging
 - ✅ Security improvements and PII protection
 - ✅ Context integration with session-based data retrieval
@@ -748,7 +791,7 @@ This enterprise-grade IVR authentication service provides:
 ### Enterprise Features
 - **High Availability**: In-memory storage with automatic failover capabilities
 - **Scalable Architecture**: Stateless design supporting horizontal scaling
-- **Comprehensive Testing**: 170+ tests ensuring reliability and correctness
+- **Comprehensive Testing**: 135 tests ensuring reliability and correctness
 - **Production Ready**: Health checks, monitoring, and operational excellence
 - **Session Management**: Context-based session handling with automatic expiration
 - **Performance Optimized**: Efficient algorithms and caching strategies
