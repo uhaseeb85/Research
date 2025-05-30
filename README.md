@@ -1,6 +1,6 @@
 # Bank IVR Authentication System - Complete Guide
 
-A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 3.1.0. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
+A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
 
 ## 🚀 Overview
 
@@ -435,7 +435,7 @@ cd ivr
 # Build the application
 mvn clean compile
 
-# Run comprehensive test suite (170+ tests)
+# Run comprehensive test suite (135 tests)
 mvn test
 
 # Start the application
@@ -533,7 +533,7 @@ curl -X POST http://localhost:8080/api/v1/auth/customer \
 ## 🧪 Testing
 
 ### Comprehensive Test Suite
-- **170+ Tests**: Complete coverage of all functionality
+- **135 Tests**: Complete coverage of all functionality
 - **Unit Tests**: Service layer, validation, and business logic
 - **Integration Tests**: Controller layer with MockMvc
 - **Brand-Specific Tests**: Authentication flows for each brand
@@ -616,7 +616,7 @@ src/
 │   ├── sample-customer-data.json    # Customer data
 │   └── dnis-configurations.json     # DNIS configurations
 └── test/
-    ├── java/           # Comprehensive test classes (170+ tests)
+    ├── java/           # Comprehensive test classes (135 tests)
     └── resources/      # Test configuration and data
 ```
 
@@ -750,7 +750,7 @@ Create comprehensive tests for your brand:
 - ✅ Trust level integration and phone match validation
 - ✅ Failed token tracking with smart re-asking logic
 - ✅ Post-validation security rules
-- ✅ Comprehensive test suite (170+ tests)
+- ✅ Comprehensive test suite (135 tests)
 - ✅ Enhanced error handling and logging
 - ✅ Security improvements and PII protection
 - ✅ Context integration with session-based data retrieval
@@ -791,7 +791,7 @@ This enterprise-grade IVR authentication service provides:
 ### Enterprise Features
 - **High Availability**: In-memory storage with automatic failover capabilities
 - **Scalable Architecture**: Stateless design supporting horizontal scaling
-- **Comprehensive Testing**: 170+ tests ensuring reliability and correctness
+- **Comprehensive Testing**: 135 tests ensuring reliability and correctness
 - **Production Ready**: Health checks, monitoring, and operational excellence
 - **Session Management**: Context-based session handling with automatic expiration
 - **Performance Optimized**: Efficient algorithms and caching strategies
