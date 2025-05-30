@@ -1,10 +1,6 @@
-# Bank IVR Authentication System - Complete Guide
-
-A comprehensive, enterprise-grade multi-factor authentication system for bank customers via IVR (Interactive Voice Response) systems, built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
-
 ## 🚀 Overview
 
-This system provides secure, stateful authentication for bank customers through IVR systems using dynamic question flows, token validation, and brand-specific configurations. The system is designed to be completely self-contained with **no external database dependencies** - all data is stored in-memory using Java collections.
+This system provides secure, stateful authentication for bank customers through IVR systems using dynamic question flows, token validation, and brand-specific configurations. The system is designed to be completely self-contained with **no external database dependencies** - all data is stored in-memory using Java collections.built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
 
 ## ✨ Key Features
 
