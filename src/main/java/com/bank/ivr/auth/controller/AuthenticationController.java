@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.validation.Valid;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +31,6 @@ import com.bank.ivr.auth.service.BrandAuthConfigurationService;
 import com.bank.ivr.auth.service.DnisConfigurationService;
 import com.bank.ivr.auth.service.SessionContextService;
 import com.bank.ivr.auth.util.LoggingUtil;
-
-import javax.validation.Valid;
 
 /**
  * REST controller for IVR authentication operations.
@@ -79,6 +79,21 @@ public class AuthenticationController {
         
         try {
             LoggingUtil.logAuthStart(logger, sessionId, brand, request.getCustomerIdentifier().toString());
+            
+            // Validate brand support first
+            if (!brandConfigService.isBrandSupported(brand)) {
+                logger.warn("Unsupported brand: {} - SessionId: {}", brand, sessionId);
+                String brandMessage = "Brand '" + brand + "' is not supported. Supported brands: " + 
+                                    brandConfigService.getAvailableBrands();
+                
+                AuthenticationResponse errorResponse = AuthenticationResponse.builder()
+                        .attemptId(attemptId)
+                        .status(AuthenticationResponse.AuthStatus.FAILED)
+                        .message(brandMessage)
+                        .build();
+                
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
             
             // Retrieve DNIS from session context
             Optional<String> dnisOpt = sessionContextService.getDnisFromSession(sessionId);

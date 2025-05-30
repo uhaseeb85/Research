@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 
 /**
  * Service for managing brand-specific authentication configurations.
@@ -202,37 +200,6 @@ public class BrandAuthConfigurationService {
      */
     public boolean isBrandSupported(String brandCode) {
         return brandConfigurations.containsKey(brandCode);
-    }
-    
-    /**
-     * Gets brand-specific retry strategies for tokens.
-     * 
-     * @param brandCode the brand code
-     * @return map of token name to retry strategy
-     */
-    public Map<String, TokenRetryStrategy> getTokenRetryStrategies(String brandCode) {
-        BrandAuthConfiguration config = getBrandConfiguration(brandCode);
-        if (config == null) {
-            return Collections.emptyMap();
-        }
-        return config.getTokenRetryStrategies();
-    }
-    
-    /**
-     * Gets the global retry policy for a brand.
-     * 
-     * @param brandCode the brand code
-     * @return the global retry policy
-     */
-    public BrandGlobalRetryPolicy getGlobalRetryPolicy(String brandCode) {
-        BrandAuthConfiguration config = getBrandConfiguration(brandCode);
-        if (config == null) {
-            // Return default policy
-            return BrandGlobalRetryPolicy.builder()
-                    .brandCode(brandCode)
-                    .build();
-        }
-        return config.getGlobalRetryPolicy();
     }
     
     /**

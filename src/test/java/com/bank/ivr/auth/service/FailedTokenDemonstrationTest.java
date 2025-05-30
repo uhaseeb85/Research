@@ -134,7 +134,7 @@ class FailedTokenDemonstrationTest {
                 "demo-session-456",
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
-                List.of(new ProvidedToken("SSN", "wrong-ssn-1")),
+                Arrays.asList(new ProvidedToken("SSN", "wrong-ssn-1")),
                 "DEMO_BANK",
                 createDefaultTrustLevelInfo()
         );
@@ -169,7 +169,7 @@ class FailedTokenDemonstrationTest {
                 "demo-session-456",
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
-                List.of(new ProvidedToken("SSN", "wrong-ssn-2")), // User provides SSN instead of PIN
+                Arrays.asList(new ProvidedToken("SSN", "wrong-ssn-2")), // User provides SSN instead of PIN
                 "DEMO_BANK",
                 createDefaultTrustLevelInfo()
         );
@@ -209,7 +209,7 @@ class FailedTokenDemonstrationTest {
                 "demo-session-456",
                 new CustomerIdentifier(CustomerIdentifier.IdentifierType.PHONE_NUMBER, "555-1234"),
                 "demo-attempt-123",
-                List.of(new ProvidedToken("DEBIT_CARD_PIN", "1234")),
+                Arrays.asList(new ProvidedToken("DEBIT_CARD_PIN", "1234")),
                 "DEMO_BANK",
                 createDefaultTrustLevelInfo()
         );

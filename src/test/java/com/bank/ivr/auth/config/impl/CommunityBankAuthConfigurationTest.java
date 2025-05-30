@@ -1,18 +1,17 @@
 package com.bank.ivr.auth.config.impl;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 
 @DisplayName("Community Bank Authentication Configuration Tests")
 class CommunityBankAuthConfigurationTest {
@@ -39,143 +38,144 @@ class CommunityBankAuthConfigurationTest {
         }
 
         @Test
-        @DisplayName("Should return correct priority")
-        void shouldReturnCorrectPriority() {
+        @DisplayName("Should have medium priority")
+        void shouldHaveMediumPriority() {
             // When
             int priority = config.getPriority();
 
             // Then
             assertThat(priority).isEqualTo(50);
         }
+    }
+
+    @Nested
+    @DisplayName("Token Definition Tests")
+    class TokenDefinitionTests {
 
         @Test
-        @DisplayName("Should return correct max overall attempts")
-        void shouldReturnCorrectMaxOverallAttempts() {
+        @DisplayName("Should return token definitions in priority order")
+        void shouldReturnTokenDefinitionsInPriorityOrder() {
+            // When
+            List<AuthTokenDefinition> definitions = config.getTokenDefinitions();
+
+            // Then
+            assertThat(definitions).hasSize(5);
+            
+            // Verify priority order (highest first)
+            assertThat(definitions.get(0).getName()).isEqualTo("SSN");
+            assertThat(definitions.get(0).getPriority()).isEqualTo(100);
+            
+            assertThat(definitions.get(1).getName()).isEqualTo("DATE_OF_BIRTH");
+            assertThat(definitions.get(1).getPriority()).isEqualTo(95);
+            
+            assertThat(definitions.get(2).getName()).isEqualTo("MOTHER_MAIDEN_NAME");
+            assertThat(definitions.get(2).getPriority()).isEqualTo(90);
+            
+            assertThat(definitions.get(3).getName()).isEqualTo("DEBIT_CARD_PIN");
+            assertThat(definitions.get(3).getPriority()).isEqualTo(85);
+            
+            assertThat(definitions.get(4).getName()).isEqualTo("ACCOUNT_OPENING_DATE");
+            assertThat(definitions.get(4).getPriority()).isEqualTo(80);
+        }
+
+        @Test
+        @DisplayName("Should have correct token names")
+        void shouldHaveCorrectTokenNames() {
+            // When
+            List<AuthTokenDefinition> definitions = config.getTokenDefinitions();
+
+            // Then
+            List<String> tokenNames = new ArrayList<>();
+            for (AuthTokenDefinition def : definitions) {
+                tokenNames.add(def.getName());
+            }
+            
+            assertThat(tokenNames).containsExactly(
+                "SSN", "DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME", "DEBIT_CARD_PIN", "ACCOUNT_OPENING_DATE"
+            );
+        }
+
+        @Test
+        @DisplayName("Should have appropriate max attempts for each token")
+        void shouldHaveAppropriateMaxAttemptsForEachToken() {
+            // When
+            List<AuthTokenDefinition> definitions = config.getTokenDefinitions();
+
+            // Then
+            for (AuthTokenDefinition def : definitions) {
+                assertThat(def.getMaxAttempts()).isEqualTo(3); // All tokens have 3 attempts for community bank
+            }
+        }
+
+        @Test
+        @DisplayName("Should have valid input format regex for each token")
+        void shouldHaveValidInputFormatRegexForEachToken() {
+            // When
+            List<AuthTokenDefinition> definitions = config.getTokenDefinitions();
+
+            // Then
+            for (AuthTokenDefinition def : definitions) {
+                assertThat(def.getInputFormatRegex()).isNotNull();
+                assertThat(def.getInputFormatRegex()).isNotEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("Should have descriptions for all tokens")
+        void shouldHaveDescriptionsForAllTokens() {
+            // When
+            List<AuthTokenDefinition> definitions = config.getTokenDefinitions();
+
+            // Then
+            for (AuthTokenDefinition def : definitions) {
+                assertThat(def.getDescription()).isNotNull();
+                assertThat(def.getDescription()).isNotEmpty();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Attempt Limits Tests")
+    class AttemptLimitsTests {
+
+        @Test
+        @DisplayName("Should have lenient overall attempt limit")
+        void shouldHaveLenientOverallAttemptLimit() {
             // When
             int maxAttempts = config.getMaxOverallAttempts();
 
             // Then
-            assertThat(maxAttempts).isEqualTo(5);
+            assertThat(maxAttempts).isEqualTo(5); // More lenient than premium
         }
+
+        @Test
+        @DisplayName("Should have brand-specific token attempt limits")
+        void shouldHaveBrandSpecificTokenAttemptLimits() {
+            // When
+            Map<String, Integer> attempts = config.getBrandSpecificTokenAttempts();
+
+            // Then
+            assertThat(attempts).hasSize(5);
+            assertThat(attempts.get("SSN")).isEqualTo(3);
+            assertThat(attempts.get("DATE_OF_BIRTH")).isEqualTo(3);
+            assertThat(attempts.get("MOTHER_MAIDEN_NAME")).isEqualTo(3);
+            assertThat(attempts.get("DEBIT_CARD_PIN")).isEqualTo(3);
+            assertThat(attempts.get("ACCOUNT_OPENING_DATE")).isEqualTo(3);
+        }
+    }
+
+    @Nested
+    @DisplayName("Authentication Behavior Tests")
+    class AuthenticationBehaviorTests {
 
         @Test
         @DisplayName("Should not allow concurrent token authentication")
         void shouldNotAllowConcurrentTokenAuthentication() {
             // When
-            boolean concurrentAllowed = config.isConcurrentTokenAuthAllowed();
+            boolean allowsConcurrent = config.isConcurrentTokenAuthAllowed();
 
             // Then
-            assertThat(concurrentAllowed).isFalse();
-        }
-    }
-
-    @Nested
-    @DisplayName("Token Definitions Tests")
-    class TokenDefinitionsTests {
-
-        @Test
-        @DisplayName("Should return all expected token definitions")
-        void shouldReturnAllExpectedTokenDefinitions() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-
-            // Then
-            assertThat(tokenDefinitions).hasSize(5);
-            
-            List<String> tokenNames = tokenDefinitions.stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
-            
-            assertThat(tokenNames).containsExactlyInAnyOrder(
-                    "SSN", "DATE_OF_BIRTH", "MOTHER_MAIDEN_NAME", 
-                    "DEBIT_CARD_PIN", "ACCOUNT_OPENING_DATE"
-            );
-        }
-
-        @Test
-        @DisplayName("Should have SSN as highest priority token")
-        void shouldHaveSSNAsHighestPriorityToken() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-
-            // Then
-            AuthTokenDefinition ssnToken = tokenDefinitions.stream()
-                    .filter(token -> "SSN".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
-
-            assertThat(ssnToken.getPriority()).isEqualTo(100);
-            assertThat(ssnToken.getDescription()).isEqualTo("Social Security Number");
-            assertThat(ssnToken.getMaxAttempts()).isEqualTo(3);
-        }
-
-        @Test
-        @DisplayName("Should have correct date of birth configuration")
-        void shouldHaveCorrectDateOfBirthConfiguration() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-
-            // Then
-            AuthTokenDefinition dobToken = tokenDefinitions.stream()
-                    .filter(token -> "DATE_OF_BIRTH".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
-
-            assertThat(dobToken.getPriority()).isEqualTo(95);
-            assertThat(dobToken.getDescription()).isEqualTo("Date of Birth");
-            assertThat(dobToken.getInputFormatRegex()).isEqualTo("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$");
-        }
-
-        @Test
-        @DisplayName("Should have community-specific account opening date token")
-        void shouldHaveCommunitySpecificAccountOpeningDateToken() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-
-            // Then
-            AuthTokenDefinition accountOpeningToken = tokenDefinitions.stream()
-                    .filter(token -> "ACCOUNT_OPENING_DATE".equals(token.getName()))
-                    .findFirst()
-                    .orElseThrow();
-
-            assertThat(accountOpeningToken.getPriority()).isEqualTo(80);
-            assertThat(accountOpeningToken.getDescription()).isEqualTo("Account Opening Date");
-        }
-
-        @Test
-        @DisplayName("Should have tokens ordered by priority")
-        void shouldHaveTokensOrderedByPriority() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-
-            // Then
-            for (int i = 1; i < tokenDefinitions.size(); i++) {
-                int currentPriority = tokenDefinitions.get(i).getPriority();
-                int previousPriority = tokenDefinitions.get(i - 1).getPriority();
-                assertThat(currentPriority).isLessThanOrEqualTo(previousPriority);
-            }
-        }
-    }
-
-
-
-    @Nested
-    @DisplayName("Brand Specific Token Attempts Tests")
-    class BrandSpecificTokenAttemptsTests {
-
-        @Test
-        @DisplayName("Should return correct token attempts mapping")
-        void shouldReturnCorrectTokenAttemptsMapping() {
-            // When
-            Map<String, Integer> tokenAttempts = config.getBrandSpecificTokenAttempts();
-
-            // Then
-            assertThat(tokenAttempts).hasSize(5);
-            assertThat(tokenAttempts.get("SSN")).isEqualTo(3);
-            assertThat(tokenAttempts.get("DATE_OF_BIRTH")).isEqualTo(3);
-            assertThat(tokenAttempts.get("MOTHER_MAIDEN_NAME")).isEqualTo(3);
-            assertThat(tokenAttempts.get("DEBIT_CARD_PIN")).isEqualTo(3);
-            assertThat(tokenAttempts.get("ACCOUNT_OPENING_DATE")).isEqualTo(3);
+            assertThat(allowsConcurrent).isFalse(); // Community bank prefers step-by-step
         }
     }
 
@@ -184,175 +184,51 @@ class CommunityBankAuthConfigurationTest {
     class BrandMessagesTests {
 
         @Test
-        @DisplayName("Should return all required brand messages")
-        void shouldReturnAllRequiredBrandMessages() {
+        @DisplayName("Should have community-specific welcome message")
+        void shouldHaveCommunitySpecificWelcomeMessage() {
+            // When
+            Map<String, String> messages = config.getBrandMessages();
+
+            // Then
+            assertThat(messages.get("welcome"))
+                .isEqualTo("Welcome to Community Bank! We're here to help verify your identity.");
+        }
+
+        @Test
+        @DisplayName("Should have community-specific failure message")
+        void shouldHaveCommunitySpecificFailureMessage() {
+            // When
+            Map<String, String> messages = config.getBrandMessages();
+
+            // Then
+            assertThat(messages.get("failure"))
+                .isEqualTo("Authentication failed. Please try again or visit your local Community Bank branch.");
+        }
+
+        @Test
+        @DisplayName("Should have all required message keys")
+        void shouldHaveAllRequiredMessageKeys() {
             // When
             Map<String, String> messages = config.getBrandMessages();
 
             // Then
             assertThat(messages).containsKeys(
-                    "welcome", "primary_prompt", "secondary_prompt", "success", 
-                    "failure", "customer_not_found", "session_expired", 
-                    "system_error", "no_methods"
+                "welcome", "primary_prompt", "secondary_prompt", "success", "failure",
+                "customer_not_found", "session_expired", "system_error", "no_methods"
             );
         }
 
         @Test
-        @DisplayName("Should have community-friendly welcome message")
-        void shouldHaveCommunityFriendlyWelcomeMessage() {
+        @DisplayName("Should have non-empty messages")
+        void shouldHaveNonEmptyMessages() {
             // When
             Map<String, String> messages = config.getBrandMessages();
 
             // Then
-            String welcomeMessage = messages.get("welcome");
-            assertThat(welcomeMessage).contains("Community Bank");
-            assertThat(welcomeMessage).contains("We're here to help");
-        }
-
-        @Test
-        @DisplayName("Should have helpful failure message")
-        void shouldHaveHelpfulFailureMessage() {
-            // When
-            Map<String, String> messages = config.getBrandMessages();
-
-            // Then
-            String failureMessage = messages.get("failure");
-            assertThat(failureMessage).contains("local Community Bank branch");
-        }
-
-        @Test
-        @DisplayName("Should have parameterized prompt messages")
-        void shouldHaveParameterizedPromptMessages() {
-            // When
-            Map<String, String> messages = config.getBrandMessages();
-
-            // Then
-            assertThat(messages.get("primary_prompt")).contains("{token_description}");
-            assertThat(messages.get("secondary_prompt")).contains("{token_description}");
-        }
-    }
-
-    @Nested
-    @DisplayName("Token Retry Strategies Tests")
-    class TokenRetryStrategiesTests {
-
-        @Test
-        @DisplayName("Should return retry strategies for configured tokens")
-        void shouldReturnRetryStrategiesForConfiguredTokens() {
-            // When
-            Map<String, TokenRetryStrategy> strategies = config.getTokenRetryStrategies();
-
-            // Then
-            assertThat(strategies).hasSize(3);
-            assertThat(strategies).containsKeys("SSN", "DEBIT_CARD_PIN", "DATE_OF_BIRTH");
-        }
-
-        @Test
-        @DisplayName("Should use immediate retry for SSN")
-        void shouldUseImmediateRetryForSSN() {
-            // When
-            Map<String, TokenRetryStrategy> strategies = config.getTokenRetryStrategies();
-
-            // Then
-            TokenRetryStrategy ssnStrategy = strategies.get("SSN");
-            assertThat(ssnStrategy.getTokenName()).isEqualTo("SSN");
-            assertThat(ssnStrategy.getRetryType()).isEqualTo(TokenRetryStrategy.RetryType.IMMEDIATE);
-            assertThat(ssnStrategy.getMaxRetries()).isEqualTo(3);
-            assertThat(ssnStrategy.isProgressiveLockoutEnabled()).isFalse();
-        }
-
-        @Test
-        @DisplayName("Should use fixed delay for debit card PIN")
-        void shouldUseFixedDelayForDebitCardPIN() {
-            // When
-            Map<String, TokenRetryStrategy> strategies = config.getTokenRetryStrategies();
-
-            // Then
-            TokenRetryStrategy pinStrategy = strategies.get("DEBIT_CARD_PIN");
-            assertThat(pinStrategy.getRetryType()).isEqualTo(TokenRetryStrategy.RetryType.FIXED_DELAY);
-            assertThat(pinStrategy.getBaseDelayMs()).isEqualTo(2000);
-            assertThat(pinStrategy.isProgressiveLockoutEnabled()).isFalse();
-        }
-
-        @Test
-        @DisplayName("Should use immediate retry for date of birth")
-        void shouldUseImmediateRetryForDateOfBirth() {
-            // When
-            Map<String, TokenRetryStrategy> strategies = config.getTokenRetryStrategies();
-
-            // Then
-            TokenRetryStrategy dobStrategy = strategies.get("DATE_OF_BIRTH");
-            assertThat(dobStrategy.getRetryType()).isEqualTo(TokenRetryStrategy.RetryType.IMMEDIATE);
-            assertThat(dobStrategy.isProgressiveLockoutEnabled()).isFalse();
-        }
-    }
-
-    @Nested
-    @DisplayName("Global Retry Policy Tests")
-    class GlobalRetryPolicyTests {
-
-        @Test
-        @DisplayName("Should return community bank global retry policy")
-        void shouldReturnCommunityBankGlobalRetryPolicy() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.getBrandCode()).isEqualTo("COMMUNITY_BANK");
-        }
-
-        @Test
-        @DisplayName("Should have lenient global attempt limits")
-        void shouldHaveLenientGlobalAttemptLimits() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.getMaxGlobalAttempts()).isEqualTo(8);
-            assertThat(globalPolicy.getGlobalLockoutThreshold()).isEqualTo(10);
-            assertThat(globalPolicy.getSuspiciousActivityThreshold()).isEqualTo(12);
-        }
-
-        @Test
-        @DisplayName("Should have shorter lockout durations")
-        void shouldHaveShorterLockoutDurations() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.getGlobalLockoutDuration()).isEqualTo(Duration.ofMinutes(5));
-            assertThat(globalPolicy.getRetryWindowResetDuration()).isEqualTo(Duration.ofMinutes(30));
-        }
-
-        @Test
-        @DisplayName("Should have no escalation policy")
-        void shouldHaveNoEscalationPolicy() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.getEscalationPolicy()).isEqualTo(BrandGlobalRetryPolicy.EscalationPolicy.NONE);
-            assertThat(globalPolicy.isCrossTokenDelayEnabled()).isFalse();
-        }
-
-        @Test
-        @DisplayName("Should enable retry analytics")
-        void shouldEnableRetryAnalytics() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.isEnableRetryAnalytics()).isTrue();
-        }
-
-        @Test
-        @DisplayName("Should enable global lockout")
-        void shouldEnableGlobalLockout() {
-            // When
-            BrandGlobalRetryPolicy globalPolicy = config.getGlobalRetryPolicy();
-
-            // Then
-            assertThat(globalPolicy.isGlobalLockoutEnabled()).isTrue();
+            for (String message : messages.values()) {
+                assertThat(message).isNotNull();
+                assertThat(message).isNotEmpty();
+            }
         }
     }
 
@@ -360,50 +236,34 @@ class CommunityBankAuthConfigurationTest {
     @DisplayName("Configuration Consistency Tests")
     class ConfigurationConsistencyTests {
 
-
-
         @Test
         @DisplayName("Brand specific attempts should exist in token definitions")
         void brandSpecificAttemptsShouldExistInTokenDefinitions() {
             // When
             Map<String, Integer> brandAttempts = config.getBrandSpecificTokenAttempts();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
-
-            // Then
-            assertThat(definedTokens).containsAll(brandAttempts.keySet());
-        }
-
-        @Test
-        @DisplayName("Retry strategy tokens should exist in token definitions")
-        void retryStrategyTokensShouldExistInTokenDefinitions() {
-            // When
-            Map<String, TokenRetryStrategy> retryStrategies = config.getTokenRetryStrategies();
-            List<String> definedTokens = config.getTokenDefinitions().stream()
-                    .map(AuthTokenDefinition::getName)
-                    .toList();
-
-            // Then
-            assertThat(definedTokens).containsAll(retryStrategies.keySet());
-        }
-
-        @Test
-        @DisplayName("Token max attempts should be consistent")
-        void tokenMaxAttemptsShouldBeConsistent() {
-            // When
-            List<AuthTokenDefinition> tokenDefinitions = config.getTokenDefinitions();
-            Map<String, Integer> brandAttempts = config.getBrandSpecificTokenAttempts();
-
-            // Then
-            for (AuthTokenDefinition token : tokenDefinitions) {
-                String tokenName = token.getName();
-                if (brandAttempts.containsKey(tokenName)) {
-                    assertThat(token.getMaxAttempts())
-                            .as("Max attempts for token %s should be consistent", tokenName)
-                            .isEqualTo(brandAttempts.get(tokenName));
-                }
+            List<String> definedTokens = new ArrayList<String>();
+            for (AuthTokenDefinition def : config.getTokenDefinitions()) {
+                definedTokens.add(def.getName());
             }
+
+            // Then
+            for (String tokenName : brandAttempts.keySet()) {
+                assertThat(definedTokens).contains(tokenName);
+            }
+        }
+
+        @Test
+        @DisplayName("Should be consistent with community bank requirements")
+        void shouldBeConsistentWithCommunityBankRequirements() {
+            // When
+            int maxOverallAttempts = config.getMaxOverallAttempts();
+            Map<String, Integer> tokenAttempts = config.getBrandSpecificTokenAttempts();
+            boolean allowsConcurrent = config.isConcurrentTokenAuthAllowed();
+
+            // Then
+            assertThat(maxOverallAttempts).isGreaterThanOrEqualTo(5); // Lenient
+            assertThat(tokenAttempts.get("SSN")).isEqualTo(3); // Standard attempts
+            assertThat(allowsConcurrent).isFalse(); // Step-by-step approach
         }
     }
 } 

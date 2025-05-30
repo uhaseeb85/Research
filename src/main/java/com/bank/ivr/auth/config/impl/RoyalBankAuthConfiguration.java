@@ -7,8 +7,6 @@ import java.util.Map;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 
 /**
  * Configuration for Royal Bank - trust-level-based authentication strategy.
@@ -94,39 +92,6 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
         messages.put("PHONE_MATCH_MULTIPLE", "Your phone number is associated with multiple accounts. Additional verification is required.");
         messages.put("PHONE_MATCH_NONE", "Your phone number could not be matched with our records. Additional verification is required.");
         return messages;
-    }
-    
-    @Override
-    public Map<String, TokenRetryStrategy> getTokenRetryStrategies() {
-        Map<String, TokenRetryStrategy> strategies = new HashMap<>();
-        
-        // SSN Last 4 strategy
-        strategies.put("SSN_LAST_4", TokenRetryStrategy.builder()
-            .tokenName("SSN_LAST_4")
-            .maxRetries(1)
-            .retryType(TokenRetryStrategy.RetryType.IMMEDIATE)
-            .build());
-            
-        // Full SSN strategy
-        strategies.put("SSN_FULL", TokenRetryStrategy.builder()
-            .tokenName("SSN_FULL")
-            .maxRetries(1)
-            .retryType(TokenRetryStrategy.RetryType.IMMEDIATE)
-            .build());
-            
-        return strategies;
-    }
-    
-    @Override
-    public BrandGlobalRetryPolicy getGlobalRetryPolicy() {
-        return BrandGlobalRetryPolicy.builder()
-            .brandCode("ROYAL_BANK")
-            .maxGlobalAttempts(4)
-            .globalLockoutEnabled(true)
-            .globalLockoutThreshold(3)
-            .escalationThreshold(2)
-            .globalLockoutDuration(java.time.Duration.ofMinutes(15))
-            .build();
     }
     
     @Override

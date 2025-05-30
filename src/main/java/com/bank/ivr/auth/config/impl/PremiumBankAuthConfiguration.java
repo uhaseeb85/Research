@@ -1,6 +1,5 @@
 package com.bank.ivr.auth.config.impl;
 
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -10,8 +9,6 @@ import org.springframework.stereotype.Component;
 
 import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.BrandGlobalRetryPolicy;
-import com.bank.ivr.auth.model.domain.TokenRetryStrategy;
 
 /**
  * Authentication configuration for Premium Bank brand.
@@ -114,60 +111,4 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
     public int getPriority() {
         return 100; // High priority configuration
     }
-    
-    @Override
-    public Map<String, TokenRetryStrategy> getTokenRetryStrategies() {
-        Map<String, TokenRetryStrategy> strategies = new HashMap<>();
-        
-        // Premium bank uses strict exponential backoff for security
-        strategies.put("DEBIT_CARD_PIN", TokenRetryStrategy.builder()
-                .tokenName("DEBIT_CARD_PIN")
-                .retryType(TokenRetryStrategy.RetryType.EXPONENTIAL_BACKOFF)
-                .maxRetries(2) // Fewer retries
-                .baseDelayMs(5000) // 5 second base delay
-                .maxDelayMs(60000) // 1 minute max
-                .multiplier(2.0)
-                .progressiveLockoutEnabled(true)
-                .lockoutDurationAfterExhaustion(Duration.ofMinutes(15))
-                .build());
-                
-        strategies.put("SSN", TokenRetryStrategy.builder()
-                .tokenName("SSN")
-                .retryType(TokenRetryStrategy.RetryType.EXPONENTIAL_BACKOFF)
-                .maxRetries(2)
-                .baseDelayMs(3000)
-                .maxDelayMs(30000)
-                .progressiveLockoutEnabled(true)
-                .lockoutDurationAfterExhaustion(Duration.ofMinutes(10))
-                .build());
-                
-        strategies.put("VOICE_BIOMETRIC", TokenRetryStrategy.builder()
-                .tokenName("VOICE_BIOMETRIC")
-                .retryType(TokenRetryStrategy.RetryType.LINEAR_BACKOFF)
-                .maxRetries(2)
-                .baseDelayMs(10000) // Longer delay for biometric
-                .progressiveLockoutEnabled(true)
-                .build());
-                
-        return strategies;
-    }
-    
-    @Override
-    public BrandGlobalRetryPolicy getGlobalRetryPolicy() {
-        return BrandGlobalRetryPolicy.builder()
-                .brandCode("PREMIUM_BANK")
-                .maxGlobalAttempts(5) // Strict limit
-                .globalLockoutEnabled(true)
-                .globalLockoutThreshold(4) // Low threshold
-                .globalLockoutDuration(Duration.ofMinutes(20)) // Longer lockout
-                .escalationPolicy(BrandGlobalRetryPolicy.EscalationPolicy.PROGRESSIVE_DELAY)
-                .escalationThreshold(3)
-                .crossTokenDelayEnabled(true) // Enable cross-token delays
-                .crossTokenDelayMultiplier(2.0)
-                .suspiciousActivityThreshold(4) // Low threshold for premium security
-                .suspiciousActivityLockoutDuration(Duration.ofMinutes(30))
-                .retryWindowResetDuration(Duration.ofHours(2)) // Longer reset window
-                .enableRetryAnalytics(true)
-                .build();
-    }
-} 
+}
