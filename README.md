@@ -21,7 +21,7 @@ This system provides secure, stateful authentication for bank customers through 
 - **Failed Token Tracking**: Smart re-asking logic prevents repeated requests for failed tokens
 
 ### Enterprise Features
-- **In-Memory Storage**: No database required - all data stored in Java collections with automatic initialization
+- **JSON-Based Storage**: Customer data loaded from JSON files with automatic initialization
 - **Stateful Session Management**: Session management with automatic expiration and context preservation
 - **Comprehensive Validation**: Input validation, attempt tracking, and security measures
 - **Production Ready**: Proper error handling, logging, monitoring, and health checks
@@ -39,8 +39,8 @@ This system provides secure, stateful authentication for bank customers through 
    - Trust level and phone match status tracking
 
 2. **Repository Layer**
-   - In-memory implementations using Java collections
-   - JSON-based data sources for session context and customer data
+   - JSON-based customer profile repository (primary)
+   - In-memory authentication context repository
    - No database dependencies
    - Automatic data initialization with test customers and DNIS configurations
 
@@ -380,7 +380,7 @@ The system comes pre-loaded with comprehensive test data:
 ## 🚀 Running the Application
 
 ### Prerequisites
-- Java 17 or higher
+- Java 8 or higher
 - Maven 3.6 or higher
 
 ### Build and Run

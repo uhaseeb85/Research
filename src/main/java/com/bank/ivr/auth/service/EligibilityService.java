@@ -180,14 +180,6 @@ public class EligibilityService {
             logger.debug("Customer eligible for MOTHER_MAIDEN_NAME authentication for brand '{}'", brand);
         }
         
-        // Check Employee ID eligibility
-        if (brandSupportedTokens.contains("EMPLOYEE_ID") && 
-            customerProfile.getEmployeeId() != null && !customerProfile.getEmployeeId().trim().isEmpty() 
-            && "ACTIVE".equals(customerProfile.getAccountStatus())) {
-            eligibleTokens.add("EMPLOYEE_ID");
-            logger.debug("Customer eligible for EMPLOYEE_ID authentication for brand '{}'", brand);
-        }
-        
         return eligibleTokens;
     }
     
