@@ -53,13 +53,50 @@ public class AuthenticationOrchestrator {
     }
     
     /**
-     * Main authentication method that handles both new and continuing authentication attempts.
-     * Now fully brand-aware across the entire authentication flow and supports context-based data.
+     * Main authentication endpoint that coordinates the entire IVR authentication flow.
      * 
-     * @param request the authentication request containing brand information
-     * @param dnis the DNIS retrieved from session context (can be null)
-     * @param sessionSsnList the list of SSNs retrieved from session context (can be null)
-     * @return the authentication response
+     * This is the primary entry point for all authentication requests and handles both
+     * new authentication attempts and continuation of existing authentication sessions.
+     * 
+     * AUTHENTICATION FLOW OVERVIEW:
+     * 1. Validates brand support and request parameters
+     * 2. Retrieves DNIS configuration for call-specific rules
+     * 3. Routes to new attempt or continuing attempt handlers
+     * 4. Applies brand-specific authentication policies throughout
+     * 5. Returns appropriate authentication response with next steps
+     * 
+     * BRAND AWARENESS:
+     * - Validates brand is supported before processing
+     * - Applies brand-specific token priorities and rules
+     * - Uses brand-specific error messages and responses
+     * - Enforces brand-specific security policies
+     * 
+     * CONTEXT INTEGRATION:
+     * - Retrieves DNIS from session context for call routing rules
+     * - Uses session SSN list for enhanced customer lookup
+     * - Applies DNIS-specific authentication limits and policies
+     * - Supports context-based customer identification
+     * 
+     * ERROR HANDLING:
+     * - Comprehensive validation of all input parameters
+     * - Brand-specific error messages for better user experience
+     * - Graceful degradation when context data unavailable
+     * - Full exception handling with appropriate logging
+     * 
+     * SECURITY FEATURES:
+     * - Brand consistency validation across session
+     * - Session-based customer lookup for enhanced security
+     * - DNIS-based call validation and routing
+     * - Comprehensive audit logging for compliance
+     * 
+     * @param request the authentication request containing customer identifier, tokens,
+     *               session ID, brand code, and trust level information
+     * @param dnis the DNIS code retrieved from session context for call-specific rules
+     *            (null if not available in session)
+     * @param sessionSsnList list of SSNs retrieved from session context for enhanced
+     *                      customer lookup (null if not available)
+     * @return AuthenticationResponse containing next authentication steps, token requests,
+     *         success/failure status, and brand-specific messaging
      */
     public AuthenticationResponse authenticateCustomer(AuthenticationRequest request, String dnis, List<String> sessionSsnList) {
         String brand = request.getBrand();
@@ -108,7 +145,47 @@ public class AuthenticationOrchestrator {
     }
     
     /**
-     * Handles a new authentication attempt with full brand awareness and context support.
+     * Handles the creation and setup of a brand new authentication attempt.
+     * 
+     * This method is called when a customer initiates a fresh authentication session
+     * and is responsible for setting up the complete authentication context.
+     * 
+     * NEW ATTEMPT FLOW:
+     * 1. Enhanced customer lookup using session context (SSN list priority)
+     * 2. Customer profile validation and brand compatibility checks
+     * 3. Generation of unique attempt ID for session tracking
+     * 4. Creation of brand-aware authentication context with DNIS rules
+     * 5. Determination of eligible authentication tokens for customer
+     * 6. Initial response building with first token request
+     * 
+     * CUSTOMER LOOKUP PRIORITY:
+     * - Primary: Session SSN list (if available from session context)
+     * - Fallback: Standard customer identifier from request
+     * - Enhanced security through multiple lookup methods
+     * 
+     * CONTEXT CREATION:
+     * - Brand-specific token eligibility evaluation
+     * - DNIS-specific authentication limits and rules
+     * - Trust level information integration
+     * - Initial token state and attempt tracking setup
+     * 
+     * ERROR SCENARIOS:
+     * - Customer not found in any lookup method
+     * - Brand validation failures
+     * - Context creation failures
+     * - Returns brand-specific error messages
+     * 
+     * SECURITY FEATURES:
+     * - Multiple customer identification methods
+     * - Brand consistency validation
+     * - Session context integration for enhanced security
+     * - Comprehensive audit logging
+     * 
+     * @param request the authentication request with customer identifier and brand
+     * @param dnis the DNIS code for call-specific authentication rules
+     * @param sessionSsnList list of SSNs from session for enhanced customer lookup
+     * @param dnisConfig the DNIS configuration object with call-specific rules
+     * @return AuthenticationResponse with initial authentication steps or error status
      */
     private AuthenticationResponse handleNewAuthenticationAttempt(AuthenticationRequest request, String dnis, List<String> sessionSsnList, DnisConfiguration dnisConfig) {
         String brand = request.getBrand();
@@ -150,7 +227,54 @@ public class AuthenticationOrchestrator {
     }
     
     /**
-     * Handles a continuing authentication attempt with brand awareness, context support, and DNIS configuration.
+     * Handles the continuation of an existing authentication attempt with token processing.
+     * 
+     * This method processes authentication attempts where a customer is providing tokens
+     * in response to previous authentication requests, maintaining session continuity.
+     * 
+     * CONTINUING ATTEMPT FLOW:
+     * 1. Context retrieval and validation using attempt ID
+     * 2. Brand consistency verification across session
+     * 3. Customer profile re-validation for security
+     * 4. Token processing with DNIS-specific rules
+     * 5. Context state updates and persistence
+     * 6. Response building with next steps or completion
+     * 
+     * CONTEXT VALIDATION:
+     * - Attempt ID must exist in persistent storage
+     * - Brand must match original authentication request
+     * - Customer profile must still be accessible
+     * - Session integrity checks for security
+     * 
+     * TOKEN PROCESSING:
+     * - Validates provided tokens against customer data
+     * - Applies DNIS-specific validation rules
+     * - Updates authentication state and progress
+     * - Handles both successful and failed validations
+     * 
+     * STATE MANAGEMENT:
+     * - Updates attempt counts and token states
+     * - Tracks authentication progress
+     * - Manages session lifecycle
+     * - Applies business rules for completion
+     * 
+     * ERROR SCENARIOS:
+     * - Context not found (expired or invalid attempt ID)
+     * - Brand mismatch across session
+     * - Customer profile unavailable
+     * - Returns appropriate error responses with brand messaging
+     * 
+     * SECURITY FEATURES:
+     * - Session integrity validation
+     * - Brand consistency enforcement
+     * - Comprehensive state tracking
+     * - DNIS-based validation rules
+     * 
+     * @param request the authentication request with tokens and attempt continuation data
+     * @param dnis the DNIS code for call-specific validation rules
+     * @param sessionSsnList list of SSNs from session (used for context validation)
+     * @param dnisConfig the DNIS configuration object with call-specific rules
+     * @return AuthenticationResponse with next steps, completion status, or error information
      */
     private AuthenticationResponse handleContinuingAuthenticationAttempt(AuthenticationRequest request, String dnis, List<String> sessionSsnList, DnisConfiguration dnisConfig) {
         String brand = request.getBrand();
