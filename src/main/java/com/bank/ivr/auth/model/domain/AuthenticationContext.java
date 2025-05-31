@@ -153,6 +153,27 @@ public class AuthenticationContext {
         return tokenState.isTokenAuthenticated(tokenName);
     }
     
+    /**
+     * Checks if a token has completely failed due to exhausting all allowed attempts.
+     * 
+     * This method tracks tokens that have used up all their retry attempts and are
+     * no longer available for authentication in this session.
+     * 
+     * IMPORTANT: This method checks attempt exhaustion, NOT validation failures.
+     * A token is considered "failed" when it has zero attempts remaining.
+     * 
+     * A token gets added to failed tokens when:
+     * - Token validation failed AND no attempts remaining for this token
+     * - DNIS strict mode blocks the token and no retries allowed
+     * - Token is rejected due to configuration limits
+     * 
+     * This is different from validation failures tracked by canReAskToken().
+     * 
+     * @param tokenName the name of the token to check
+     * @return true if token has exhausted all attempts (completely failed),
+     *         false if token still has attempts available
+     * @see TokenState#isTokenFailed(String) for detailed implementation
+     */
     public boolean isTokenFailed(String tokenName) {
         return tokenState.isTokenFailed(tokenName);
     }
@@ -177,6 +198,30 @@ public class AuthenticationContext {
         return tokenState.getAskedTokenValidationFailureCount(tokenName);
     }
     
+    /**
+     * Determines if a token should be avoided for re-asking due to user providing incorrect values.
+     * 
+     * This method implements "smart re-asking logic" to prevent repeatedly asking for tokens
+     * that customers have already attempted but provided incorrect values for.
+     * 
+     * IMPORTANT: This method does NOT check attempt limits or eligibility. It specifically
+     * tracks whether the user has provided an incorrect value for this token.
+     * 
+     * Returns false (cannot re-ask) when:
+     * - System asked for the token
+     * - User provided a value for the token  
+     * - The provided value failed validation (was incorrect)
+     * 
+     * Returns true (can ask/re-ask) when:
+     * - Token has never been asked
+     * - Token was asked but user didn't provide any value
+     * - Token was asked and user provided correct value
+     * 
+     * @param tokenName the name of the token to check
+     * @return false if user provided incorrect value (should avoid re-asking), 
+     *         true if token can be asked/re-asked
+     * @see TokenState#canReAskToken(String) for detailed implementation
+     */
     public boolean canReAskToken(String tokenName) {
         return tokenState.canReAskToken(tokenName);
     }
