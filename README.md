@@ -738,64 +738,125 @@ Create comprehensive tests for your brand:
 - Business rule behavior
 - Failure scenarios
 
-## 🆕 Recent Enhancements
+### Token Determination Rule Execution Flow
 
-### Version 2.0 - Major Release
-- ✅ DNIS support with phone number-based routing
-- ✅ Brand-aware authentication with comprehensive configuration
-- ✅ Trust level integration and phone match validation
-- ✅ Failed token tracking with smart re-asking logic
-- ✅ Post-validation security rules
-- ✅ Comprehensive test suite (135 tests)
-- ✅ Enhanced error handling and logging
-- ✅ Security improvements and PII protection
-- ✅ Context integration with session-based data retrieval
-- ✅ Rule-based architecture with eligibility and token selection rules
-- ✅ Trust-based authentication with conditional logic
+#### Phase 1: Token Selection Rule Evaluation
+When determining which token to ask next, the system follows this **"first match wins"** approach:
 
-### Architecture Improvements
-- **Enhanced Request Model**: Support for trust level info and session context
-- **Service Layer Expansion**: New services for DNIS and rules
-- **Comprehensive API**: Brand-specific endpoints, DNIS configuration, and health checks
-- **Improved Code Quality**: Fixed all compilation issues and updated test expectations
-- **Rule System**: Extensible rule-based system for complex business logic
+1. **Get Applicable Rules**: Filter rules by brand (`DEFAULT` or exact brand match)
+2. **Sort by Priority**: Rules sorted in descending order (highest priority first)
+3. **Sequential Evaluation**: Rules evaluated one by one until a token is returned
+4. **Immediate Return**: As soon as any rule returns a non-null token, **evaluation stops**
+5. **Remaining Rules Skipped**: Lower priority rules are completely bypassed
 
-## 📄 License
+```java
+// Example execution order for Royal Bank:
+// 1. RoyalBankTrustBasedSsnRule (priority: 200) → returns "SSN_LAST_4" ✅ STOPS HERE
+// 2. SomeOtherRule (priority: 100) → ❌ NEVER EVALUATED  
+// 3. DefaultRule (priority: 50) → ❌ NEVER EVALUATED
+```
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+#### Phase 2: Token Availability Validation
+Selected tokens must pass **ALL** these availability checks:
 
-## 🎯 Project Capabilities Summary
+```java
+✅ context.getEligibleTokens().contains(tokenName)     // Customer is eligible
+✅ !context.isTokenAuthenticated(tokenName)           // Not already authenticated
+✅ !context.isTokenFailed(tokenName)                  // Hasn't failed validation
+✅ context.hasRemainingAttemptsForToken(tokenName)    // Has attempts remaining
+✅ context.canReAskToken(tokenName)                   // Smart re-asking allows it
+```
 
-This enterprise-grade IVR authentication service provides:
+#### Phase 3: Priority-Based Fallback
+If **no rules return a token** OR **selected token fails availability checks**:
 
-### Core Authentication Capabilities
-- **Multi-Brand Support**: Distinct authentication flows for different banking brands
-- **DNIS Integration**: Phone number-based routing with configurable security rules
-- **Advanced Token Management**: Multiple authentication factors with intelligent prioritization
-- **Trust Level Integration**: Phone match validation and risk-based authentication decisions
-- **Context Integration**: Session-based data retrieval with automatic DNIS and SSN lookup
-- **Rule-Based System**: Extensible architecture with eligibility and token selection rules
+1. **Iterate Through All Brand Token Definitions** (by AuthTokenDefinition)
+2. **Apply Availability Checks** to each token
+3. **Select Highest Priority Available Token** that passes all checks
+4. **Not First Available** - system finds the **best** available token
 
-### Security & Compliance
-- **Progressive Security**: Escalating security measures based on failed attempts and suspicious activity
-- **Comprehensive Audit Trail**: Detailed logging for compliance and security monitoring
-- **PII Protection**: Secure handling and masking of sensitive customer information
-- **Configurable Security Policies**: Brand and DNIS-specific security controls
-- **Post-Validation Security**: Additional checks after successful authentication
-- **Trust-Based Authentication**: Advanced conditional logic for risk assessment
+```java
+// Example for Community Bank fallback:
+// - SSN (priority: 100) → ❌ Already failed validation  
+// - DATE_OF_BIRTH (priority: 95) → ✅ Available ← SELECTED
+// - MOTHER_MAIDEN_NAME (priority: 90) → ✅ Available (lower priority)
+// - DEBIT_CARD_PIN (priority: 85) → ❌ No attempts remaining
+// Result: Returns DATE_OF_BIRTH (highest priority available)
+```
 
-### Enterprise Features
-- **High Availability**: In-memory storage with automatic failover capabilities
-- **Scalable Architecture**: Stateless design supporting horizontal scaling
-- **Comprehensive Testing**: 135 tests ensuring reliability and correctness
-- **Production Ready**: Health checks, monitoring, and operational excellence
-- **Session Management**: Context-based session handling with automatic expiration
-- **Performance Optimized**: Efficient algorithms and caching strategies
+#### Phase 4: No Available Tokens Response
+If **no tokens pass availability checks**, the system returns:
 
-### Developer Experience
-- **Self-Contained**: No external dependencies, runs out-of-the-box
-- **Extensible Design**: Easy addition of new brands, tokens, and business rules
-- **Comprehensive Documentation**: Detailed API documentation and examples
-- **Test-Driven Development**: Extensive test coverage for all functionality
-- **Rule-Based Extensions**: Simple interfaces for adding complex business logic
-- **Clean Architecture**: Well-organized codebase with clear separation of concerns 
+**🔸 Status**: `FAILED`  
+**🔸 Session**: Authentication context deleted (session ends)  
+**🔸 Message**: Brand-specific "no_methods" message
+
+```json
+{
+  "attemptId": "attempt-123",
+  "status": "FAILED", 
+  "message": "No verification methods available. Please visit your local Community Bank branch for assistance.",
+  "failedTokens": ["SSN", "DEBIT_CARD_PIN"],
+  "authenticatedTokens": []
+}
+```
+
+**Exception Cases:**
+- **Partial Authentication**: If `isPartialAuthenticationAllowed()` returns `true`, system may succeed with limited access
+- **Alternative Tokens**: System tries token determination twice for transient conditions
+
+### Rule Configuration and Priority
+
+#### Brand-Specific Token Priorities
+Each brand defines token priorities in their configuration:
+
+```java
+// Community Bank priorities:
+AuthTokenDefinition.builder()
+    .name("SSN")
+    .priority(100)  // Highest priority
+    .build(),
+AuthTokenDefinition.builder()
+    .name("DATE_OF_BIRTH") 
+    .priority(95)   // Second priority
+    .build()
+```
+
+#### Rule Priority System
+Rules have their own priority separate from token priorities:
+
+```java
+@Component
+public class RoyalBankTrustBasedSsnRule implements TokenSelectionRule {
+    @Override
+    public int getPriority() {
+        return 200; // High priority brand-specific rule
+    }
+    
+    @Override
+    public String getBrand() {
+        return "ROYAL_BANK"; // Only applies to Royal Bank
+    }
+}
+
+@Component  
+public class DefaultTokenRule implements TokenSelectionRule {
+    @Override
+    public int getPriority() {
+        return 50; // Lower priority generic rule
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Applies to all brands
+    }
+}
+```
+
+#### Smart Re-Asking Logic
+The system implements intelligent token re-asking:
+
+- **✅ Can Re-Ask**: Token was asked but user didn't provide it
+- **❌ Cannot Re-Ask**: Token was provided by user but failed validation
+- **✅ Can Re-Ask**: Token hasn't been asked yet
+- **❌ Cannot Re-Ask**: Token exhausted all attempts
