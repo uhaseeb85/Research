@@ -6,11 +6,10 @@ This system provides secure, stateful authentication for bank customers through 
 
 **Want to add a new bank brand with custom authentication?** 
 
-📖 **[Complete Developer Guide](DEVELOPER_GUIDE.md)** - Step-by-step tutorial with examples  
-⚡ **[Quick Reference](QUICK_REFERENCE.md)** - Cheat sheet for fast implementation
+📖 **[Complete Developer Guide](DEVELOPER_GUIDE.md)** - Step-by-step tutorial with examples
 
 ### 🎯 What You Can Build:
-- **Custom Authentication Tokens** (Face ID, Mobile PIN, Biometrics, etc.)
+- **Custom Authentication Tokens** (SSN, Mobile PIN, Biometrics, etc.)
 - **Brand-Specific Business Rules** (age-based preferences, VIP handling)
 - **Trust-Level Integration** (high/low trust customers get different flows)
 - **Phone Number Routing** (different DNIS = different authentication rules)

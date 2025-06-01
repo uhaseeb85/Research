@@ -22,6 +22,24 @@ Customer calls → DNIS routing → Brand config → Token selection → Validat
 3. **Business Rules**: Logic for which tokens to ask when
 4. **DNIS Config**: Phone-number-based routing rules
 
+## 🔧 Development Commands
+
+```bash
+# Build and test
+mvn clean install
+
+# Run specific test
+mvn test -Dtest=YourBankAuthConfigurationTest
+
+# Start application  
+mvn spring-boot:run
+
+# Test your API
+curl -X POST http://localhost:8080/api/v1/auth/customer \
+  -H "Content-Type: application/json" \
+  -d '{"sessionId":"test","customerIdentifier":{"type":"PHONE_NUMBER","value":"+1555000001"},"brand":"YOUR_BANK"}'
+```
+
 ## 🚀 Adding a New Brand: Step-by-Step
 
 ### Step 1: Define Your Brand Strategy
