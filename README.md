@@ -1,145 +1,441 @@
-## 🚀 Overview
+# 🏦 Authentication Framework - Developer Guide
 
-This system provides secure, stateful authentication for bank customers through IVR systems using dynamic question flows, token validation, and brand-specific configurations. The system is designed to be completely self-contained with **no external database dependencies** - all data is stored in-memory using Java collections.built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
+## 🎯 Overview
 
-## 👨‍💻 For Developers: Adding New Banks
+**Java 1.8 Compatible** | **Spring Boot 2.7.18** | **In-Memory Storage**
 
-**Want to add a new bank brand with custom authentication?** 
+## 🏗️ Framework Architecture
 
-📖 **[Complete Developer Guide](DEVELOPER_GUIDE.md)** - Step-by-step tutorial with examples
+### Core Components
+1. **Brand Configuration** - Defines tokens, priorities, and policies for your bank
+2. **Token Validators** - Implements validation logic for each authentication method
+3. **Business Rules** - Controls authentication flow based on customer context
+4. **DNIS Configuration** - Phone-number-based routing and security policies
+5. **Session Management** - Stateful authentication context with automatic cleanup
 
-### 🎯 What You Can Build:
-- **Custom Authentication Tokens** (SSN, Mobile PIN, Biometrics, etc.)
-- **Brand-Specific Business Rules** (age-based preferences, VIP handling)
-- **Trust-Level Integration** (high/low trust customers get different flows)
-- **Phone Number Routing** (different DNIS = different authentication rules)
-- **Post-Validation Security** (additional checks after successful authentication)
+### Authentication Flow
+```
+Customer calls → DNIS lookup → Brand config → Eligibility check → Token selection → Validation → Post-validation rules → Success/Continue/Fail
+```
 
-### ⚡ Quick Example:
-```java
-// 1. Define your brand
-@Component
-public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
-    public String getBrandCode() { return "DIGITAL_BANK"; }
-    public List<AuthTokenDefinition> getTokenDefinitions() {
-        return Arrays.asList(
-            AuthTokenDefinition.builder()
-                .name("FACE_ID").priority(200).maxAttempts(1).build(),
-            AuthTokenDefinition.builder()
-                .name("MOBILE_PIN").priority(150).maxAttempts(3).build()
-        );
-    }
-}
+### Rule Execution Order
+```
+1. ELIGIBILITY RULES (Once per session)
+   ├── Determine available tokens based on customer profile
+   └── Store in authentication context
 
-// 2. Create token validator
-@Component
-public class FaceIdValidator implements TokenValidator {
-    public String getTokenName() { return "FACE_ID"; }
-    public String getBrand() { return "DIGITAL_BANK"; }
-    public boolean validate(String customerId, String hash, CustomerProfile profile) {
-        return BiometricUtil.verify(hash, profile.getFaceIdHash());
-    }
-}
+2. TOKEN SELECTION RULES (Every token request)
+   ├── Execute by priority (highest first)
+   ├── First rule returning a token wins
+   └── Fallback to priority-based selection
 
-// 3. Add business rules (optional)
-@Component
-public class DigitalBankAgeRule implements TokenSelectionRule {
-    public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
-        // Young customers prefer biometrics
-        if (profile.getAge() < 30 && context.getEligibleTokens().contains("FACE_ID")) {
-            return "FACE_ID";
-        }
-        return null;
-    }
-    public String getBrand() { return "DIGITAL_BANK"; }
-    public int getPriority() { return 200; }
+3. POST-VALIDATION RULES (After each successful token)
+   ├── Security and risk assessment
+   └── May require additional authentication
+```
+
+## 📞 DNIS Configuration (Phone Number Routing)
+
+### How DNIS Works
+1. **DNIS Retrieval**: Retrieved from session context using `sessionId`
+2. **Configuration Lookup**: System finds specific DNIS config or uses `"DEFAULT"`
+3. **Rule Application**: DNIS settings override brand defaults
+
+### DNIS Configuration Example
+```json
+// Add to dnis-configurations.json
+{
+  "dnis": "18005551111",
+  "description": "Digital Bank mobile support line",
+  "allowSsnAuthentication": true,
+  "allowFaceIdAuthentication": true,
+  "allowMobilePinAuthentication": true,
+  "requireMultiFactorAuth": false,
+  "allowTrustLevelBypass": true,
+  "enableStrictValidation": false,
+  "maxAuthenticationAttempts": 3,
+  "sessionTimeoutMinutes": 5
 }
 ```
 
-That's it! Your brand is ready with intelligent, age-based biometric authentication. 🎉
+### Default DNIS Behavior
+- **If no DNIS found**: Uses `"DEFAULT"` configuration automatically
+- **If DNIS not configured**: Falls back to `"DEFAULT"` configuration  
+- **Default settings**: Permissive (all methods allowed, standard security)
 
-## ✨ Key Features
+## 🔧 Development Commands
 
-### Core Authentication
-- **Brand-Aware Authentication**: Different brands with distinct authentication flows, token requirements, and customer messages
-- **DNIS Configuration Support**: Phone number-based routing with configurable authentication rules per DNIS
-- **Multi-Factor Authentication**: Support for multiple authentication tokens (SSN, Debit Card PIN, Date of Birth, Mother's Maiden Name, Account Number)
-- **Dynamic Question Flows**: Intelligent token selection based on customer eligibility, priority, and brand rules
-- **Trust Level Integration**: Phone match validation and trust-based authentication decisions
-- **Context Integration**: Session-based data retrieval with DNIS and SSN from previous API calls
+```bash
+# Build and run tests
+mvn clean install
 
-### Advanced Security Features
-- **Post-Validation Rules**: Additional security checks after successful token validation
-- **Failed Token Tracking**: Smart re-asking logic prevents repeated requests for failed tokens
+# Run specific brand tests
+mvn test -Dtest=DigitalBankIntegrationTest
 
-### Enterprise Features
-- **JSON-Based Storage**: Customer data loaded from JSON files with automatic initialization
-- **Stateful Session Management**: Session management with automatic expiration and context preservation
-- **Comprehensive Validation**: Input validation, attempt tracking, and security measures
-- **Production Ready**: Proper error handling, logging, monitoring, and health checks
-- **Rule-Based Architecture**: Extensible system with eligibility rules and token selection rules
-- **Trust-Based Authentication**: Advanced conditional logic based on trust levels and phone matching
+# Start application
+mvn spring-boot:run
 
-## 🏗️ Architecture
+# Test your brand API
+curl -X POST http://localhost:8080/api/v1/auth/customer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "test-session",
+    "customerIdentifier": {
+      "type": "PHONE_NUMBER",
+      "value": "+1555000001"
+    },
+    "brand": "DIGITAL_BANK",
+    "trustLevelInfo": {
+      "trustLevel": "GREEN",
+      "phoneMatchStatus": "SINGLE_MATCH",
+      "matchedSsnCount": 1
+    }
+  }'
+```
 
-### Core Components
+## 🚀 Quick Start - Add Your Bank in 5 Steps
 
-1. **Model Layer**
-   - Request/Response models with comprehensive validation
-   - Domain models (CustomerProfile, AuthenticationContext, AuthTokenDefinition, DnisConfiguration)
-   - Builder patterns for complex object creation
-   - Trust level and phone match status tracking
+### Step 1: Define Your Authentication Strategy
 
-2. **Repository Layer**
-   - JSON-based customer profile repository (primary)
-   - In-memory authentication context repository
-   - No database dependencies
-   - Automatic data initialization with test customers and DNIS configurations
+```yaml
+Brand: DIGITAL_BANK
+Philosophy: "Mobile-first, biometric-preferred authentication"
 
-3. **Service Layer**
-   - `AuthenticationOrchestrator`: Core authentication orchestration
-   - `TokenValidationService`: Token validation management with brand-specific validators
-   - `BrandAuthConfigurationService`: Brand-specific configuration management
-   - `DnisConfigurationService`: DNIS-based routing and configuration
-   - `PostValidationRuleService`: Additional security rules after token validation
-   - `SessionContextService`: Session context data management
-   - `TokenSelectionService`: Rule-based token selection logic
+Token Priority:
+  1. FACE_ID (Priority: 200) - Modern biometric, 1 attempt only
+  2. MOBILE_PIN (Priority: 150) - 6-digit mobile PIN, 3 attempts  
+  3. SSN_LAST_4 (Priority: 100) - Traditional fallback, 2 attempts
 
-4. **Rule System**
-   - `EligibilityRule`: Determines which tokens are available to customers
-   - `TokenSelectionRule`: Decides which token to ask for based on business logic
-   - `PostValidationRule`: Additional security checks after successful validation
-   - Priority-based rule execution with brand-specific overrides
+Business Rules:
+  - Customers under 30: Prefer FACE_ID
+  - High-value accounts ($100k+): Require 2-factor authentication
+  - Low trust level: Force SSN_LAST_4 + additional verification
 
-5. **Controller Layer**
-   - REST API with comprehensive error handling and brand context
-   - Health check endpoint with DNIS support status
-   - DNIS configuration endpoints
-   - Brand-specific authentication method endpoints
+Security:
+  - Max 3 overall attempts per session
+  - No retries for biometric failures (security policy)
+  - Enhanced verification for accounts with recent changes
+```
 
-6. **Security**
-   - BCrypt password hashing for sensitive data
-   - Masked logging for PII protection
-   - Secure token validation with attempt limiting
-   - Trust level-based authentication decisions
+### Step 2: Create Brand Configuration
+
+```java
+// src/main/java/com/bank/ivr/auth/config/DigitalBankAuthConfiguration.java
+@Component
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    @Override
+    public String getBrandCode() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return Arrays.asList(
+            // Modern biometric - highest priority, no retries
+            AuthTokenDefinition.builder()
+                .name("FACE_ID")
+                .description("Face ID Biometric Authentication")
+                .priority(200)
+                .maxAttempts(1)  // Security: No retries for biometrics
+                .inputFormatRegex("^[A-F0-9]{64}$")  // 64-char hex hash
+                .build(),
+                
+            // Mobile PIN - second choice
+            AuthTokenDefinition.builder()
+                .name("MOBILE_PIN")
+                .description("6-Digit Mobile Banking PIN")
+                .priority(150)
+                .maxAttempts(3)
+                .inputFormatRegex("^\\d{6}$")
+                .build(),
+                
+            // Traditional fallback
+            AuthTokenDefinition.builder()
+                .name("SSN_LAST_4")
+                .description("Last 4 digits of Social Security Number")
+                .priority(100)
+                .maxAttempts(2)
+                .inputFormatRegex("^\\d{4}$")
+                .build()
+        );
+    }
+    
+    @Override
+    public int getMaxOverallAttempts() {
+        return 3;  // Strict security for digital bank
+    }
+    
+    @Override
+    public boolean isPartialAuthenticationAllowed() {
+        return false;  // Require full authentication always
+    }
+    
+    @Override
+    public Map<String, String> getBrandMessages() {
+        Map<String, String> messages = new HashMap<>();
+        messages.put("welcome", "Welcome to Digital Bank. Please authenticate using your preferred method.");
+        messages.put("failure", "Authentication failed. Please visit our mobile app or call customer service.");
+        messages.put("no_methods", "No authentication methods available. Please update your profile in our mobile app.");
+        messages.put("customer_not_found", "Customer profile not found. Please verify your information.");
+        messages.put("session_expired", "Your session has expired. Please call again to restart authentication.");
+        return messages;
+    }
+}
+```
+
+### Step 3: Implement Token Validators
+
+Create validators for each custom token:
+
+```java
+// src/main/java/com/bank/ivr/auth/validator/FaceIdValidator.java
+@Component
+public class FaceIdValidator implements TokenValidator {
+    
+    private static final Logger logger = LoggerFactory.getLogger(FaceIdValidator.class);
+    
+    @Override
+    public String getTokenName() {
+        return "FACE_ID";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";  // Brand-specific validator
+    }
+    
+    @Override
+    public boolean validate(String customerId, String providedHash, CustomerProfile profile) {
+        try {
+            String storedFaceHash = profile.getFaceIdHash();
+            if (storedFaceHash == null) {
+                logger.warn("No Face ID hash stored for customer: {}", customerId);
+                return false;
+            }
+            
+            // Implement your biometric comparison logic
+            boolean matches = BiometricUtil.compareFaceHashes(providedHash, storedFaceHash);
+            
+            logger.debug("Face ID validation for customer {}: {}", 
+                        customerId, matches ? "SUCCESS" : "FAILED");
+            return matches;
+            
+        } catch (Exception e) {
+            logger.error("Face ID validation error for customer: {}", customerId, e);
+            return false;
+        }
+    }
+}
+
+// src/main/java/com/bank/ivr/auth/validator/MobilePinValidator.java
+@Component
+public class MobilePinValidator implements TokenValidator {
+    
+    @Override
+    public String getTokenName() {
+        return "MOBILE_PIN";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public boolean validate(String customerId, String providedPin, CustomerProfile profile) {
+        // Use BCrypt for secure PIN comparison
+        String storedPinHash = profile.getMobilePinHash();
+        return storedPinHash != null && BCrypt.checkpw(providedPin, storedPinHash);
+    }
+}
+```
+
+### Step 4: Add Intelligent Business Rules (Optional but Powerful)
+
+#### Token Selection Rules - Control Which Token to Ask When
+
+```java
+// src/main/java/com/bank/ivr/auth/rule/DigitalBankAgeBasedRule.java
+@Component
+public class DigitalBankAgeBasedRule implements TokenSelectionRule {
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
+        // Young customers prefer biometrics
+        if (customerProfile.getAge() != null && customerProfile.getAge() < 30) {
+            if (context.getEligibleTokens().contains("FACE_ID") && 
+                context.canReAskToken("FACE_ID")) {
+                return "FACE_ID";
+            }
+        }
+        
+        // High-value customers get mobile PIN for enhanced security
+        if (customerProfile.getAccountBalance() > 50000) {
+            if (context.getEligibleTokens().contains("MOBILE_PIN") && 
+                context.canReAskToken("MOBILE_PIN")) {
+                return "MOBILE_PIN";
+            }
+        }
+        
+        return null; // Let default priority-based logic handle
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 200; // High priority custom rule
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "DIGITAL_BANK_AGE_BASED_SELECTION";
+    }
+}
+
+// Trust-based token selection
+@Component
+public class DigitalBankTrustRule implements TokenSelectionRule {
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
+        TrustLevelInfo trustInfo = context.getTrustLevelInfo();
+        
+        if (trustInfo != null && "RED".equals(trustInfo.getTrustLevel())) {
+            // Low trust - force traditional authentication
+            if (context.getEligibleTokens().contains("SSN_LAST_4") && 
+                context.canReAskToken("SSN_LAST_4")) {
+                return "SSN_LAST_4";
+            }
+        }
+        
+        return null;
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 250; // Higher priority than age rule - security first
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "DIGITAL_BANK_TRUST_BASED_SELECTION";
+    }
+}
+```
+
+#### Post-Validation Rules - Additional Security After Successful Authentication
+
+```java
+// src/main/java/com/bank/ivr/auth/rule/DigitalBankSecurityRule.java
+@Component
+public class DigitalBankSecurityRule implements PostValidationRule {
+    
+    @Override
+    public PostValidationResult evaluate(CustomerProfile customerProfile, String brand,
+                                       List<String> authenticatedTokens, 
+                                       TrustLevelInfo trustLevelInfo) {
+        
+        // High-value accounts need multi-factor authentication
+        if (customerProfile.getAccountBalance() > 100000 && 
+            authenticatedTokens.size() < 2) {
+            
+            return PostValidationResult.builder()
+                .requireAdditionalAuth(true)
+                .requiredTokens(Arrays.asList("MOBILE_PIN", "SSN_LAST_4"))
+                .riskLevel("HIGH")
+                .reason("High-value account requires multi-factor authentication")
+                .build();
+        }
+        
+        // Recent password change requires additional verification
+        if (customerProfile.getLastPasswordChange() != null && 
+            customerProfile.getLastPasswordChange().isAfter(LocalDateTime.now().minusDays(7))) {
+            
+            return PostValidationResult.builder()
+                .requireAdditionalAuth(true)
+                .requiredTokens(Arrays.asList("SSN_LAST_4"))
+                .riskLevel("MEDIUM")
+                .reason("Recent password change detected - additional verification required")
+                .build();
+        }
+        
+        return PostValidationResult.noAdditionalAuth();
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "DIGITAL_BANK_SECURITY_RULE";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 150;
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";
+    }
+}
+```
+
+#### Eligibility Rules - Control Which Tokens Are Available to Customers
+
+```java
+// src/main/java/com/bank/ivr/auth/rule/DigitalBankBiometricEligibilityRule.java
+@Component
+public class DigitalBankBiometricEligibilityRule implements EligibilityRule {
+    
+    @Override
+    public boolean isEligible(CustomerProfile customerProfile, String brand) {
+        // Only customers with stored biometric data and legal age can use Face ID
+        return customerProfile.getFaceIdHash() != null &&
+               customerProfile.getAge() != null && 
+               customerProfile.getAge() >= 18 && // Legal requirement
+               "ACTIVE".equals(customerProfile.getAccountStatus());
+    }
+    
+    @Override
+    public String getTokenName() {
+        return "FACE_ID";
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 100;
+    }
+}
+```
 
 ## 📡 API Endpoints
 
-### Authentication Endpoint
-```
+### Authentication
+```http
 POST /api/v1/auth/customer
 Content-Type: application/json
-```
 
-#### New Authentication Request with DNIS
-```json
 {
   "sessionId": "session-123",
   "customerIdentifier": {
     "type": "PHONE_NUMBER",
     "value": "+1234567890"
   },
-  "brand": "PREMIUM_BANK",
+  "brand": "DIGITAL_BANK",
   "trustLevelInfo": {
     "trustLevel": "GREEN",
     "phoneMatchStatus": "SINGLE_MATCH",
@@ -148,771 +444,142 @@ Content-Type: application/json
 }
 ```
 
-Note: `dnis` and `sessionSsn` are now retrieved from session context automatically using the `sessionId`.
-
-#### Continuing Authentication Request
-```json
-{
-  "sessionId": "session-123",
-  "customerIdentifier": {
-    "type": "PHONE_NUMBER", 
-    "value": "+1234567890"
-  },
-  "attemptId": "uuid-from-previous-response",
-  "providedTokens": [
-    {
-      "tokenName": "SSN",
-      "tokenValue": "123456789"
-    }
-  ],
-  "brand": "PREMIUM_BANK"
-}
+### Brand Information
+```http
+GET /api/v1/auth/methods/DIGITAL_BANK    # Get authentication methods
+GET /api/v1/auth/brands                  # Get all supported brands
 ```
 
-#### Enhanced Response Format
-```json
-{
-  "attemptId": "attempt-123",
-  "status": "PENDING_MORE_TOKENS",
-  "message": "Please also provide your date of birth for additional verification.",
-  "primaryTokenToAsk": {
-    "name": "DATE_OF_BIRTH",
-    "description": "Date of Birth",
-    "inputFormatRegex": "^\\d{2}/\\d{2}/\\d{4}$"
-  },
-  "secondaryTokensAccepted": [
-    {
-      "name": "MOTHER_MAIDEN_NAME",
-      "description": "Mother's Maiden Name"
-    }
-  ],
-  "remainingAttempts": 2,
-  "authenticatedTokens": ["SSN"],
-  "failedTokens": ["DEBIT_CARD_PIN"]
-}
+### DNIS Configuration
+```http
+GET /api/v1/auth/dnis/18005551111        # Get specific DNIS config
+GET /api/v1/auth/dnis                    # Get all DNIS configurations
 ```
 
-### Brand-Specific Endpoints
-```
-GET /api/v1/auth/methods/{brand}    # Get authentication methods for a brand
-GET /api/v1/auth/brands             # Get all supported brands
-```
+## 🚨 Best Practices & Common Pitfalls
 
-### DNIS Configuration Endpoints
-```
-GET /api/v1/auth/dnis/{dnis}        # Get DNIS configuration
-GET /api/v1/auth/dnis               # Get all DNIS configurations
-```
-
-### Health Check
-```
-GET /api/v1/auth/health             # Health check with DNIS support status
-```
-
-## 🏢 Brand Configuration
-
-The system supports multiple brands with distinct configurations:
-
-### Supported Brands
-- **PREMIUM_BANK**: High-security multi-factor authentication
-- **COMMUNITY_BANK**: Simplified single-factor authentication  
-- **ROYAL_BANK**: Enhanced security with trust-based authentication and complex conditional rules
-
-### Brand-Specific Features
-- Custom token definitions and priorities
-- Maximum overall attempt limits
-- Concurrent token authentication settings
-- Brand-specific customer messages
-- Trust-level based authentication rules
-
-## 📞 DNIS Support
-
-### Pre-configured DNIS Numbers
-- **18001234567**: Premium banking services (high security)
-- **18009876543**: General customer service (standard security)
-- **18005551234**: Mobile banking services (medium security)
-- **18007778888**: Business banking services (enhanced security)
-- **DEFAULT**: Default configuration for unspecified numbers
-
-### DNIS Configuration Features
-- Authentication method restrictions per DNIS
-- Multi-factor authentication requirements
-- Trust level bypass settings
-- Phone match validation controls
-- Session timeout configurations
-- Maximum authentication attempts per DNIS
-
-### DNIS Configuration Structure
-```json
-{
-  "dnis": "18001234567",
-  "description": "Premium banking services - high security DNIS",
-  "allowSsnAuthentication": true,
-  "allowPinAuthentication": true,
-  "allowDateOfBirthAuthentication": true,
-  "allowMotherMaidenNameAuthentication": false,
-  "allowAccountNumberAuthentication": true,
-  "requireMultiFactorAuth": true,
-  "allowTrustLevelBypass": false,
-  "enablePhoneMatchValidation": true,
-  "maxAuthenticationAttempts": 2,
-  "sessionTimeoutMinutes": 10
-}
-```
-
-## 🔐 Trust-Based Authentication
-
-### Trust Level System
-The system supports sophisticated trust-based authentication with conditional logic:
-
-#### Trust Levels
-- **GREEN (High Trust)**: Simplified authentication, single factor may suffice
-- **RED (Low Trust)**: Enhanced verification required, full SSN and additional tokens
-
-#### Phone Match Status
-- **NOT_MATCHED**: Phone not matched with any SSN
-- **SINGLE_MATCH**: Phone matched with exactly one SSN
-- **MULTIPLE_MATCHES**: Phone matched with multiple SSNs
-
-#### Trust Level Example Scenarios
-
-**Royal Bank Trust Matrix:**
-| Trust Level | Phone Match Status | Initial Token |
-|-------------|-------------------|---------------|
-| GREEN | NOT_MATCHED | SSN_LAST_4 |
-| GREEN | SINGLE_MATCH | SSN_LAST_4 |
-| GREEN | MULTIPLE_MATCHES | SSN_LAST_4 |
-| RED | NOT_MATCHED | SSN_FULL |
-| RED | SINGLE_MATCH | SSN_FULL |
-| RED | MULTIPLE_MATCHES | SSN_FULL |
-
-## 🔄 Rule-Based System
-
-### Three Rule Types
-
-#### 1. Eligibility Rules
-- **Purpose**: Determine which authentication methods are available to a customer
-- **When**: Called during initial context creation (once per session)
-- **Examples**: Check if customer has SSN, PIN, or biometric data on record
-
-#### 2. Token Selection Rules
-- **Purpose**: Decide the specific token to request based on complex business logic
-- **When**: Called during response building (every time we need to ask for a token)
-- **Examples**: Trust-based selection, brand-specific preferences
-
-#### 3. Post-Validation Rules
-- **Purpose**: Additional security checks after successful token validation
-- **When**: Called after each successful token validation
-- **Examples**: Trust level verification, phone match validation, risk assessment
-
-### Rule Execution Sequence
-
-#### Phase 1: Session Initialization
-1. Customer calls in
-2. EligibilityService determines available tokens
-3. Available tokens stored in AuthenticationContext
-
-#### Phase 2: Token Selection (Every Request)
-1. AuthenticationResponseService builds response
-2. TokenSelectionService determines next token
-3. Rules evaluated BY PRIORITY (highest first)
-4. First applicable rule wins
-
-#### Phase 3: Post-Validation (After Each Token)
-1. Token successfully validated
-2. PostValidationRuleService evaluates security rules
-3. Additional tokens may be required based on risk assessment
-4. Trust level and context evaluation
-
-### Adding New Rules
-
-#### Example Eligibility Rule
+### ✅ Best Practices
 ```java
-@Component
-public class BiometricEligibilityRule implements EligibilityRule {
-    @Override
-    public boolean isEligible(CustomerProfile customerProfile, String brand) {
-        return customerProfile.getBiometricHash() != null 
-               && "ACTIVE".equals(customerProfile.getAccountStatus());
-    }
-    
-    @Override
-    public String getTokenName() {
-        return "BIOMETRIC";
-    }
-    
-    @Override
-    public int getPriority() {
-        return 150;
-    }
+// DO: Keep validators simple and focused
+@Override
+public boolean validate(String customerId, String value, CustomerProfile profile) {
+    return BCrypt.checkpw(value, profile.getStoredHash());
+}
+
+// DO: Use meaningful rule priorities
+public int getPriority() {
+    return 200; // Higher than default (100), lower than critical security (300)
+}
+
+// DO: Be explicit about brand targeting
+public String getBrand() {
+    return "DIGITAL_BANK"; // Specific brand only
+}
+
+// DO: Handle edge cases gracefully
+if (customerProfile.getAge() == null) {
+    return null; // Let other rules handle
 }
 ```
 
-#### Example Token Selection Rule
+### ❌ Common Pitfalls
 ```java
-@Component
-public class TechBankMobileFirstRule implements TokenSelectionRule {
-    @Override
-    public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
-        if (context.getEligibleTokens().contains("MOBILE_PIN")) {
-            return "MOBILE_PIN";
-        }
-        return "SSN"; // Fallback
-    }
-    
-    @Override
-    public String getBrand() {
-        return "TECH_BANK";
-    }
-    
-    @Override
-    public int getPriority() {
-        return 200;
-    }
+// DON'T: Hard-code brand logic in validators
+if (brand.equals("DIGITAL_BANK") && someCondition) {
+    // This creates tight coupling
 }
-```
 
-#### Example Post-Validation Rule
-```java
-@Component
-public class HighValueCustomerRule implements PostValidationRule {
-    @Override
-    public PostValidationResult evaluate(CustomerProfile customerProfile, String brand,
-                                       List<String> authenticatedTokens, 
-                                       TrustLevelInfo trustLevelInfo) {
-        if (customerProfile.getAccountBalance() > 100000 && 
-            authenticatedTokens.size() < 2) {
-            return PostValidationResult.builder()
-                .requireAdditionalAuth(true)
-                .requiredTokens(Arrays.asList("SSN_FULL", "DATE_OF_BIRTH"))
-                .riskLevel("HIGH")
-                .reason("High-value customer requires enhanced verification")
-                .build();
-        }
-        return PostValidationResult.noAdditionalAuth();
-    }
-    
-    @Override
-    public String getRuleName() {
-        return "HIGH_VALUE_CUSTOMER_RULE";
-    }
-    
-    @Override
-    public int getPriority() {
-        return 150;
-    }
+// DON'T: Use low priorities that never execute
+public int getPriority() {
+    return 1; // Will be overridden by everything
 }
-```
 
-## 🛡️ Post-Validation Rules
-
-After successful token validation, additional security checks can be performed:
-
-### When Post-Validation Rules Trigger
-- **Low Trust Scenarios**: When external trust assessment indicates suspicious activity
-- **Phone Number Issues**: When phone numbers don't match or match multiple customers
-- **High-Value Customers**: When additional security is warranted for premium accounts
-- **Risk Indicators**: When customer profile shows recent changes or suspicious activity
-
-### Example Post-Validation Scenarios
-
-#### Low Trust Level (RED)
-```java
-// After validating SSN_LAST_4 successfully:
-// → Rule requires: ["SSN_FULL", "DEBIT_CARD_PIN"]
-// → Risk Level: "HIGH"
-// → Reason: "Low trust level detected (RED). Additional verification required."
-```
-
-#### Multiple Phone Matches
-```java
-// After validating DEBIT_CARD_PIN successfully:
-// → Rule requires: ["SSN_FULL", "DATE_OF_BIRTH"]  
-// → Risk Level: "MEDIUM"
-// → Reason: "Phone number matches 3 customer accounts. Additional verification required."
-```
-
-## 📊 Session Context Integration
-
-The system retrieves session data from context instead of request body:
-
-### Session Context Data
-- **DNIS**: Retrieved from session context using sessionId
-- **Session SSN List**: List of SSNs from previous API calls
-- **Customer Lookup Priority**: Session SSN takes precedence over phone number
-
-### Sample Session Context
-```json
-{
-  "sessionId": "session-12345",
-  "dnis": "18001234567",
-  "sessionSsn": ["123456789", "987654321"],
-  "callerPhoneNumber": "+1234567890",
-  "previousApiCallId": "api-call-001",
-  "timestamp": 1703097600000
+// DON'T: Apply rules to all brands unintentionally
+public String getBrand() {
+    return "DEFAULT"; // Affects ALL brands
 }
+
+// DON'T: Ignore null safety
+customerProfile.getAge() < 30; // NPE if age is null
 ```
 
-## 🧪 Test Data
-
-The system comes pre-loaded with comprehensive test data:
-
-### Test Customers
-| Customer ID | Phone Number | Account Number | SSN | PIN | Status |
-|-------------|--------------|----------------|-----|-----|--------|
-| CUST001 | +1234567890 | ACC001 | 123456789 | 1234 | ACTIVE |
-| CUST002 | +1987654321 | ACC002 | 987654321 | 1234 | ACTIVE |
-| CUST003 | +1555123456 | ACC003 | 555123456 | 1234 | ACTIVE |
-| CUST004 | +1444555666 | ACC004 | - | - | INACTIVE |
-
-### Test Scenarios
-- Brand-specific authentication flows
-- DNIS-based routing scenarios
-- Failed token demonstration
-- Trust level validation
-- Context-based authentication
-
-## 🚀 Running the Application
-
-### Prerequisites
-- Java 8 or higher
-- Maven 3.6 or higher
-
-### Build and Run
-```bash
-# Clone the repository
-git clone <repository-url>
-cd ivr
-
-# Build the application
-mvn clean compile
-
-# Run comprehensive test suite (135 tests)
-mvn test
-
-# Start the application
-mvn spring-boot:run
-```
-
-The application will start on `http://localhost:8080`
-
-### Testing the API
-
-```bash
-# Test health endpoint
-curl http://localhost:8080/api/v1/auth/health
-
-# Get supported brands
-curl http://localhost:8080/api/v1/auth/brands
-
-# Get DNIS configurations
-curl http://localhost:8080/api/v1/auth/dnis
-
-# Start context-based authentication
-curl -X POST http://localhost:8080/api/v1/auth/customer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionId": "session-12345",
-    "customerIdentifier": {
-      "type": "PHONE_NUMBER",
-      "value": "+1234567890"
-    },
-    "brand": "PREMIUM_BANK",
-    "trustLevelInfo": {
-      "trustLevel": "GREEN",
-      "phoneMatchStatus": "SINGLE_MATCH",
-      "matchedSsnCount": 1
-    }
-  }'
-
-# Continue authentication with token
-curl -X POST http://localhost:8080/api/v1/auth/customer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionId": "session-12345",
-    "customerIdentifier": {
-      "type": "PHONE_NUMBER",
-      "value": "+1234567890"
-    },
-    "attemptId": "<attempt-id-from-previous-response>",
-    "providedTokens": [
-      {
-        "tokenName": "SSN",
-        "tokenValue": "123456789"
-      }
-    ],
-    "brand": "PREMIUM_BANK"
-  }'
-```
-
-## ⚙️ Configuration
-
-### Application Properties
-- `app.auth.default-session-timeout`: Session timeout (default: 15m)
-- `app.auth.max-overall-attempts`: Maximum authentication attempts (default: 5)
-- `server.port`: Server port (default: 8080)
-- `ivr.auth.repository.customer.type`: Repository type (memory/json)
-
-### Profiles
-- `default`: Standard configuration
-- `test`: Test configuration with reduced timeouts
-
-## 🔐 Authentication Flow
-
-1. **Customer Identification**: Customer provides identifier (phone, account, or customer ID)
-2. **Session Context Lookup**: System retrieves DNIS and session SSN from context
-3. **Brand & DNIS Validation**: System validates brand support and applies DNIS-specific rules
-4. **Trust Level Assessment**: Phone match status and trust level evaluation
-5. **Eligibility Check**: System determines available authentication tokens based on customer profile and brand rules
-6. **Token Selection**: Rule-based system determines which token to ask for
-7. **Token Validation**: Customer provides token value, system validates against stored data
-8. **Post-Validation Rules**: Additional security checks based on trust level and context
-9. **Completion Check**: System evaluates if authentication requirements are met
-10. **Result**: Authentication succeeds, fails, or continues with additional token requests
-
-## 🛡️ Security Features
-
-- **Encrypted Storage**: Sensitive data (PINs) stored using BCrypt hashing
-- **Advanced Attempt Limiting**: Per-token, per-brand, and overall attempt limits
-- **Session Management**: Automatic session expiration and cleanup
-- **Input Validation**: Comprehensive validation of all inputs with brand context
-- **Audit Logging**: Detailed logging for security monitoring and compliance
-- **PII Protection**: Sensitive data masked in logs and responses
-- **Trust Level Integration**: Phone match validation and trust-based decisions
-- **DNIS Security**: Phone number-based security controls and restrictions
-- **Post-Validation Security**: Additional checks after successful authentication
-
-## 🧪 Testing
-
-### Comprehensive Test Suite
-- **135 Tests**: Complete coverage of all functionality
-- **Unit Tests**: Service layer, validation, and business logic
-- **Integration Tests**: Controller layer with MockMvc
-- **Brand-Specific Tests**: Authentication flows for each brand
-- **DNIS Tests**: DNIS configuration and routing
-- **Security Tests**: Failed token handling and suspicious activity detection
-- **Rule Tests**: Eligibility and token selection rule validation
-- **Trust-Based Tests**: Trust level and phone match scenario validation
+## 🧪 Testing Strategy
 
 ### Test Categories
-- Authentication controller tests (24 test classes)
-- Service layer tests (comprehensive coverage)
-- Model validation tests
-- Brand configuration tests
-- DNIS configuration tests
-- Failed token demonstration tests
-- Context integration tests
-- Trust-based authentication tests
+1. **Unit Tests** - Individual component testing
+2. **Integration Tests** - Full authentication flows
+3. **Brand-Specific Tests** - Custom token and rule testing
+4. **DNIS Tests** - Phone number routing scenarios
+5. **Security Tests** - Failed token and attack scenarios
 
-## 🔧 Extensibility
+### Essential Test Scenarios
+- **Happy path**: Normal authentication flow
+- **Multi-factor**: High-value customer scenarios  
+- **Trust levels**: RED vs GREEN trust handling
+- **Failed tokens**: Invalid input handling
+- **DNIS routing**: Different phone number behaviors
+- **Rule conflicts**: Multiple rules interaction
 
-### Adding New Authentication Tokens
-1. Add token definition to brand configuration
-2. Create validator implementing `TokenValidator`
-3. Create eligibility rule implementing `EligibilityRule`
-4. Update customer profile fields if needed
-5. Add token selection logic if custom rules needed
+## 📊 Monitoring & Observability
 
-### Adding New Brands
-1. Add brand configuration implementing `BrandAuthConfiguration`
-2. Define brand-specific token definitions and rules
-3. Configure brand-specific messages and policies
-4. Create brand-specific token selection rules if needed
-5. Update tests for new brand scenarios
-
-### Adding New DNIS Numbers
-1. Add DNIS configuration in `dnis-configurations.json`
-2. Define DNIS-specific authentication rules
-3. Configure security settings and restrictions
-4. Test DNIS-based routing scenarios
-
-### Adding New Business Rules
-1. **Eligibility Rules**: Implement `EligibilityRule` interface
-2. **Token Selection Rules**: Implement `TokenSelectionRule` interface
-3. **Post-Validation Rules**: Implement `PostValidationRule` interface
-4. Register as Spring bean - rules are automatically discovered
-
-### Extending Trust-Based Authentication
-1. Add new trust level conditions to existing rules
-2. Create brand-specific trust rules implementing `TokenSelectionRule`
-3. Configure rule priorities to control execution order
-4. Add comprehensive test scenarios
-
-## 📊 Monitoring and Operations
-
-- **Health Checks**: `/api/v1/auth/health` endpoint with DNIS support status
-- **Metrics**: Spring Boot Actuator endpoints
-- **Structured Logging**: Comprehensive logging with session tracking
-- **Error Handling**: Brand-aware error responses with appropriate HTTP status codes
-- **Performance Monitoring**: Processing time tracking and optimization
-- **Security Monitoring**: Failed attempt tracking and suspicious activity detection
-- **Rule Monitoring**: Rule execution tracking and performance metrics
-
-## 🏗️ Development
-
-### Project Structure
-```
-src/
-├── main/java/com/bank/ivr/auth/
-│   ├── config/          # Configuration classes
-│   ├── controller/      # REST controllers
-│   ├── model/          # Data models (request, response, domain)
-│   ├── repository/     # Data access layer (in-memory/JSON)
-│   ├── rule/           # Business rules and post-validation
-│   ├── service/        # Business logic services
-│   ├── util/           # Utility classes
-│   └── validator/      # Token validators
-├── main/resources/
-│   ├── application.yml # Configuration
-│   ├── sample-session-contexts.json # Session context data
-│   ├── sample-customer-data.json    # Customer data
-│   └── dnis-configurations.json     # DNIS configurations
-└── test/
-    ├── java/           # Comprehensive test classes (135 tests)
-    └── resources/      # Test configuration and data
-```
-
-### Key Design Patterns
-- **Builder Pattern**: Complex object creation (requests, responses)
-- **Strategy Pattern**: Token validation and business rules
-- **Repository Pattern**: Data access abstraction with in-memory/JSON implementation
-- **Service Layer**: Business logic encapsulation with clear separation of concerns
-- **Factory Pattern**: Brand and DNIS configuration creation
-- **Rule Pattern**: Extensible rule-based system for eligibility and token selection
-
-## 🏦 Bank Onboarding Guide
-
-### Adding a New Bank
-
-To add a new bank to the system, follow these steps:
-
-#### 1. Define Your Bank's Authentication Strategy
-```yaml
-Brand: TECH_BANK
-Description: "Modern digital bank with mobile-first authentication"
-
-Token Priorities: 
-  - Primary (Priority 150): MOBILE_PIN (4-6 digits)
-  - Secondary (Priority 120): BIOMETRIC_ID 
-  - Fallback (Priority 100): ACCOUNT_NUMBER
-
-Security Policies:
-  - Max Overall Attempts: 5
-  - Multi-Factor Preferred: Yes
-
-Trust Level Rules:
-  - GREEN: Single factor authentication allowed
-  - RED: Enhanced verification required
-```
-
-#### 2. Implement Custom Token Validators
-```java
-@Component
-public class TechBankMobilePinValidator implements TokenValidator {
-    @Override
-    public String getTokenName() {
-        return "MOBILE_PIN";
-    }
-    
-    @Override
-    public String getBrand() {
-        return "TECH_BANK";
-    }
-    
-    @Override
-    public boolean validate(String customerId, String providedPin, CustomerProfile profile) {
-        // Custom validation logic for Tech Bank mobile PIN
-        return EncryptionUtil.verify(providedPin, profile.getMobilePin());
-    }
-}
-```
-
-#### 3. Create Brand Configuration
-```java
-@Component
-public class TechBankAuthConfiguration implements BrandAuthConfiguration {
-    @Override
-    public String getBrandCode() {
-        return "TECH_BANK";
-    }
-    
-    @Override
-    public List<AuthTokenDefinition> getTokenDefinitions() {
-        return Arrays.asList(
-            AuthTokenDefinition.builder()
-                .name("MOBILE_PIN")
-                .description("Mobile Banking PIN")
-                .priority(150)
-                .maxAttempts(3)
-                .build()
-        );
-    }
-}
-```
-
-#### 4. Configure DNIS Support
-Add DNIS configuration for your bank's phone numbers:
-```json
-{
-  "dnis": "18005559999",
-  "description": "Tech Bank customer service",
-  "allowMobilePinAuthentication": true,
-  "requireMultiFactorAuth": false,
-  "maxAuthenticationAttempts": 5
-}
-```
-
-#### 5. Add Business Rules (Optional)
-```java
-@Component
-public class TechBankMobileFirstRule implements TokenSelectionRule {
-    @Override
-    public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
-        // Prefer mobile PIN for Tech Bank customers
-        if (context.getEligibleTokens().contains("MOBILE_PIN")) {
-            return "MOBILE_PIN";
-        }
-        return null; // Let default logic handle
-    }
-    
-    @Override
-    public String getBrand() {
-        return "TECH_BANK";
-    }
-    
-    @Override
-    public int getPriority() {
-        return 200;
-    }
-}
-```
-
-#### 6. Test Your Implementation
-Create comprehensive tests for your brand:
-- Brand-specific authentication flows
-- Custom token validation
-- Business rule behavior
-- Failure scenarios
-
-### Token Determination Rule Execution Flow
-
-#### Phase 1: Token Selection Rule Evaluation
-When determining which token to ask next, the system follows this **"first match wins"** approach:
-
-1. **Get Applicable Rules**: Filter rules by brand (`DEFAULT` or exact brand match)
-2. **Sort by Priority**: Rules sorted in descending order (highest priority first)
-3. **Sequential Evaluation**: Rules evaluated one by one until a token is returned
-4. **Immediate Return**: As soon as any rule returns a non-null token, **evaluation stops**
-5. **Remaining Rules Skipped**: Lower priority rules are completely bypassed
+The framework provides comprehensive logging:
 
 ```java
-// Example execution order for Royal Bank:
-// 1. RoyalBankTrustBasedSsnRule (priority: 200) → returns "SSN_LAST_4" ✅ STOPS HERE
-// 2. SomeOtherRule (priority: 100) → ❌ NEVER EVALUATED  
-// 3. DefaultRule (priority: 50) → ❌ NEVER EVALUATED
+// Authentication flow tracking
+logger.info("Brand: {}, Customer: {}, Token: {}, Result: {}", 
+           brand, customerId, tokenName, result);
+
+// Rule execution monitoring
+logger.debug("Rule '{}' executed for brand '{}' with priority {}", 
+            ruleName, brand, priority);
+
+// Performance metrics
+logger.debug("Authentication completed in {}ms for brand '{}'", 
+            duration, brand);
+
+// Security events
+logger.warn("Multiple failed attempts for customer: {}, brand: {}", 
+           customerId, brand);
 ```
 
-#### Phase 2: Token Availability Validation
-Selected tokens must pass **ALL** these availability checks:
+## 🎯 Quick Reference Checklist
 
-```java
-✅ context.getEligibleTokens().contains(tokenName)     // Customer is eligible
-✅ !context.isTokenAuthenticated(tokenName)           // Not already authenticated
-✅ !context.isTokenFailed(tokenName)                  // Hasn't failed validation
-✅ context.hasRemainingAttemptsForToken(tokenName)    // Has attempts remaining
-✅ context.canReAskToken(tokenName)                   // Smart re-asking allows it
-```
+When adding a new bank, ensure you have:
 
-#### Phase 3: Priority-Based Fallback
-If **no rules return a token** OR **selected token fails availability checks**:
+### Required Components ✅
+- [ ] `BrandAuthConfiguration` implementation
+- [ ] `TokenValidator` for each custom token
+- [ ] Test customer data in JSON files
+- [ ] Comprehensive unit tests
+- [ ] Integration test scenarios
 
-1. **Iterate Through All Brand Token Definitions** (by AuthTokenDefinition)
-2. **Apply Availability Checks** to each token
-3. **Select Highest Priority Available Token** that passes all checks
-4. **Not First Available** - system finds the **best** available token
+### Optional but Recommended Components ⚡
+- [ ] `TokenSelectionRule` for business logic
+- [ ] `PostValidationRule` for security policies
+- [ ] `EligibilityRule` for token availability
+- [ ] DNIS configuration for phone routing
+- [ ] Brand-specific error messages
 
-```java
-// Example for Community Bank fallback:
-// - SSN (priority: 100) → ❌ Already failed validation  
-// - DATE_OF_BIRTH (priority: 95) → ✅ Available ← SELECTED
-// - MOTHER_MAIDEN_NAME (priority: 90) → ✅ Available (lower priority)
-// - DEBIT_CARD_PIN (priority: 85) → ❌ No attempts remaining
-// Result: Returns DATE_OF_BIRTH (highest priority available)
-```
+### Key Concepts 🧠
+- **Brand Code**: Unique identifier (e.g., "DIGITAL_BANK")
+- **Token Priority**: Higher numbers asked first (200 > 100)
+- **Rule Priority**: Higher numbers execute first (300 > 200)
+- **Eligibility**: Controls who can use which tokens
+- **Smart Re-asking**: Framework won't re-ask failed tokens
+- **DNIS**: Phone number determines authentication rules
 
-#### Phase 4: No Available Tokens Response
-If **no tokens pass availability checks**, the system returns:
+---
 
-**🔸 Status**: `FAILED`  
-**🔸 Session**: Authentication context deleted (session ends)  
-**🔸 Message**: Brand-specific "no_methods" message
+## 🚀 Ready to Build Your Bank's Authentication Experience!
 
-```json
-{
-  "attemptId": "attempt-123",
-  "status": "FAILED", 
-  "message": "No verification methods available. Please visit your local Community Bank branch for assistance.",
-  "failedTokens": ["SSN", "DEBIT_CARD_PIN"],
-  "authenticatedTokens": []
-}
-```
+This framework handles the complexity of stateful authentication, DNIS routing, and brand-specific business rules so you can focus on implementing your bank's unique authentication strategy.
 
-**Exception Cases:**
-- **Partial Authentication**: If `isPartialAuthenticationAllowed()` returns `true`, system may succeed with limited access
-- **Alternative Tokens**: System tries token determination twice for transient conditions
+**Next Steps:**
+1. Define your authentication strategy
+2. Implement your brand configuration
+3. Create token validators
+4. Add business rules (optional)
+5. Test thoroughly
+6. Deploy to production
 
-### Rule Configuration and Priority
-
-#### Brand-Specific Token Priorities
-Each brand defines token priorities in their configuration:
-
-```java
-// Community Bank priorities:
-AuthTokenDefinition.builder()
-    .name("SSN")
-    .priority(100)  // Highest priority
-    .build(),
-AuthTokenDefinition.builder()
-    .name("DATE_OF_BIRTH") 
-    .priority(95)   // Second priority
-    .build()
-```
-
-#### Rule Priority System
-Rules have their own priority separate from token priorities:
-
-```java
-@Component
-public class RoyalBankTrustBasedSsnRule implements TokenSelectionRule {
-    @Override
-    public int getPriority() {
-        return 200; // High priority brand-specific rule
-    }
-    
-    @Override
-    public String getBrand() {
-        return "ROYAL_BANK"; // Only applies to Royal Bank
-    }
-}
-
-@Component  
-public class DefaultTokenRule implements TokenSelectionRule {
-    @Override
-    public int getPriority() {
-        return 50; // Lower priority generic rule
-    }
-    
-    @Override
-    public String getBrand() {
-        return "DEFAULT"; // Applies to all brands
-    }
-}
-```
-
-#### Smart Re-Asking Logic
-The system implements intelligent token re-asking:
-
-- **✅ Can Re-Ask**: Token was asked but user didn't provide it
-- **❌ Cannot Re-Ask**: Token was provided by user but failed validation
-- **✅ Can Re-Ask**: Token hasn't been asked yet
-- **❌ Cannot Re-Ask**: Token exhausted all attempts
+The framework is designed to be production-ready with proper error handling, security measures, and comprehensive monitoring built-in.
