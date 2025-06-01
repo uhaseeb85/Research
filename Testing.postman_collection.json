@@ -1,0 +1,112 @@
+{
+	"info": {
+		"_postman_id": "3c3901d7-df47-4926-aad0-da38a0418be7",
+		"name": "Testing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "6552999"
+	},
+	"item": [
+		{
+			"name": "ivrAuth first",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var template = `\r",
+							"<style type=\"text/css\">\r",
+							"    .tftable {font-size:14px;color:#333333;width:100%;border-width: 1px;border-color: #87ceeb;border-collapse: collapse;}\r",
+							"    .tftable th {font-size:18px;background-color:#87ceeb;border-width: 1px;padding: 8px;border-style: solid;border-color: #87ceeb;text-align:left;}\r",
+							"    .tftable tr {background-color:#ffffff;}\r",
+							"    .tftable td {font-size:14px;border-width: 1px;padding: 8px;border-style: solid;border-color: #87ceeb;}\r",
+							"    .tftable tr:hover {background-color:#e0ffff;}\r",
+							"</style>\r",
+							"\r",
+							"<table class=\"tftable\" border=\"1\">\r",
+							"    <tr>\r",
+							"        <th>Attempt ID</th>\r",
+							"        <th>Status</th>\r",
+							"        <th>Message</th>\r",
+							"    </tr>\r",
+							"    <tr>\r",
+							"        <td>{{response.attemptId}}</td>\r",
+							"        <td>{{response.status}}</td>\r",
+							"        <td>{{response.message}}</td>\r",
+							"    </tr>\r",
+							"</table>\r",
+							"`;\r",
+							"\r",
+							"function constructVisualizerPayload() {\r",
+							"    var res = pm.response.json();\r",
+							"    return {response: res};\r",
+							"}\r",
+							"\r",
+							"pm.visualizer.set(template, constructVisualizerPayload());"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"sessionId\": \"session-12345\",\r\n  \"customerIdentifier\": {\r\n    \"type\": \"PHONE_NUMBER\",\r\n    \"value\": \"+1234567890\"\r\n  },\r\n  \"attemptId\": null,\r\n  \"providedTokens\": [],\r\n  \"brand\": \"PREMIUM_BANK\",\r\n  \"trustLevelInfo\": {\r\n    \"trustLevel\": \"GREEN\",\r\n    \"phoneMatchStatus\": \"SINGLE_MATCH\",\r\n    \"matchedSsnCount\": 1\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/auth/customer",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"customer"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ivrAuth second",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"sessionId\": \"session-12345\",\r\n  \"customerIdentifier\": {\r\n    \"type\": \"PHONE_NUMBER\",\r\n    \"value\": \"+1234567890\"\r\n  },\r\n  \"attemptId\": \"1c6edb71-2b8d-4427-93cd-217b805f89c9\",\r\n  \"providedTokens\": [\r\n    {\r\n      \"tokenName\": \"SSN\",\r\n      \"tokenValue\": \"123-45-6789\"\r\n    }\r\n  ],\r\n  \"brand\": \"PREMIUM_BANK\",\r\n  \"trustLevelInfo\": {\r\n    \"trustLevel\": \"GREEN\",\r\n    \"phoneMatchStatus\": \"SINGLE_MATCH\",\r\n    \"matchedSsnCount\": 1\r\n  },\r\n  \"newAttempt\": false\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/auth/customer",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"customer"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
