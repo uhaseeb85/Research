@@ -2,6 +2,63 @@
 
 This system provides secure, stateful authentication for bank customers through IVR systems using dynamic question flows, token validation, and brand-specific configurations. The system is designed to be completely self-contained with **no external database dependencies** - all data is stored in-memory using Java collections.built with Spring Boot 2.7.18. Features brand-aware authentication, DNIS support, trust-based authentication, and comprehensive security controls.
 
+## 👨‍💻 For Developers: Adding New Banks
+
+**Want to add a new bank brand with custom authentication?** 
+
+📖 **[Complete Developer Guide](DEVELOPER_GUIDE.md)** - Step-by-step tutorial with examples  
+⚡ **[Quick Reference](QUICK_REFERENCE.md)** - Cheat sheet for fast implementation
+
+### 🎯 What You Can Build:
+- **Custom Authentication Tokens** (Face ID, Mobile PIN, Biometrics, etc.)
+- **Brand-Specific Business Rules** (age-based preferences, VIP handling)
+- **Trust-Level Integration** (high/low trust customers get different flows)
+- **Phone Number Routing** (different DNIS = different authentication rules)
+- **Post-Validation Security** (additional checks after successful authentication)
+
+### ⚡ Quick Example:
+```java
+// 1. Define your brand
+@Component
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
+    public String getBrandCode() { return "DIGITAL_BANK"; }
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return Arrays.asList(
+            AuthTokenDefinition.builder()
+                .name("FACE_ID").priority(200).maxAttempts(1).build(),
+            AuthTokenDefinition.builder()
+                .name("MOBILE_PIN").priority(150).maxAttempts(3).build()
+        );
+    }
+}
+
+// 2. Create token validator
+@Component
+public class FaceIdValidator implements TokenValidator {
+    public String getTokenName() { return "FACE_ID"; }
+    public String getBrand() { return "DIGITAL_BANK"; }
+    public boolean validate(String customerId, String hash, CustomerProfile profile) {
+        return BiometricUtil.verify(hash, profile.getFaceIdHash());
+    }
+}
+
+// 3. Add business rules (optional)
+@Component
+public class DigitalBankAgeRule implements TokenSelectionRule {
+    public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
+        // Young customers prefer biometrics
+        if (profile.getAge() < 30 && context.getEligibleTokens().contains("FACE_ID")) {
+            return "FACE_ID";
+        }
+        return null;
+    }
+    public String getBrand() { return "DIGITAL_BANK"; }
+    public int getPriority() { return 200; }
+}
+```
+
+That's it! Your brand is ready with intelligent, age-based biometric authentication. 🎉
+
 ## ✨ Key Features
 
 ### Core Authentication
