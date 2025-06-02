@@ -1,38 +1,36 @@
 package com.bank.ivr.auth.service;
 
-import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
-import com.bank.ivr.auth.model.domain.AuthenticationContext;
-import com.bank.ivr.auth.model.domain.CustomerProfile;
-import com.bank.ivr.auth.rule.TokenSelectionRule;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
+import com.bank.ivr.auth.model.domain.AuthenticationContext;
+import com.bank.ivr.auth.model.domain.CustomerProfile;
+import com.bank.ivr.auth.rule.TokenSelectionRule;
 
 /**
  * Service responsible for determining which authentication token to ask for next.
- * Uses token selection rules with proper priority ordering and brand filtering.
+ * Uses brand-configured token selection rules with proper priority ordering.
  */
 @Service
 public class TokenSelectionService {
     
     private static final Logger logger = LoggerFactory.getLogger(TokenSelectionService.class);
     
-    private final List<TokenSelectionRule> tokenSelectionRules;
+    private final BrandConfiguredRuleService brandConfiguredRuleService;
     
     @Autowired
-    public TokenSelectionService(List<TokenSelectionRule> tokenSelectionRules) {
-        this.tokenSelectionRules = tokenSelectionRules;
+    public TokenSelectionService(BrandConfiguredRuleService brandConfiguredRuleService) {
+        this.brandConfiguredRuleService = brandConfiguredRuleService;
     }
     
     /**
-     * Determines the next token to ask using token selection rules.
-     * Rules are evaluated in priority order (highest first).
+     * Determines the next token to ask using brand-configured token selection rules.
+     * Rules are evaluated in brand-configured priority order (highest first).
      * 
      * @param context the authentication context
      * @param customerProfile the customer profile
@@ -44,20 +42,22 @@ public class TokenSelectionService {
                                                  List<AuthTokenDefinition> brandTokenDefinitions) {
         String brand = context.getBrand();
         
-        logger.debug("Determining next token using {} selection rules for brand: {}", 
-                    tokenSelectionRules.size(), brand);
+        logger.debug("Determining next token using brand-configured rules for brand: {}", brand);
         
-        // First, try token selection rules (highest priority first)
-        String selectedTokenName = evaluateTokenSelectionRules(context, customerProfile, brand);
+        // Get brand-configured token selection rules
+        List<TokenSelectionRule> applicableRules = brandConfiguredRuleService.getTokenSelectionRulesForBrand(brand);
+        
+        // First, try brand-configured token selection rules (highest priority first)
+        String selectedTokenName = evaluateTokenSelectionRules(applicableRules, context, customerProfile, brand);
         
         if (selectedTokenName != null) {
             // Find the token definition for the selected token
             AuthTokenDefinition selectedToken = findTokenDefinition(selectedTokenName, brandTokenDefinitions);
             if (selectedToken != null && isTokenAvailable(selectedToken, context)) {
-                logger.debug("Token selection rule selected token: {} for brand: {}", selectedTokenName, brand);
+                logger.debug("Brand-configured rule selected token: {} for brand: {}", selectedTokenName, brand);
                 return selectedToken;
             } else {
-                logger.debug("Token selection rule selected unavailable token: {} for brand: {}", selectedTokenName, brand);
+                logger.debug("Brand-configured rule selected unavailable token: {} for brand: {}", selectedTokenName, brand);
             }
         }
         
@@ -66,7 +66,7 @@ public class TokenSelectionService {
     }
     
     /**
-     * Handles token failure scenarios using token selection rules.
+     * Handles token failure scenarios using brand-configured token selection rules.
      * 
      * @param context the authentication context
      * @param customerProfile the customer profile
@@ -80,87 +80,58 @@ public class TokenSelectionService {
                                                  List<AuthTokenDefinition> brandTokenDefinitions) {
         String brand = context.getBrand();
         
-        logger.debug("Handling token failure for token: {} using selection rules for brand: {}", failedToken, brand);
+        logger.debug("Handling token failure for token: {} using brand-configured rules for brand: {}", failedToken, brand);
         
-        // Get applicable rules for this brand, sorted by priority
-        List<TokenSelectionRule> applicableRules = getApplicableRules(context, customerProfile, brand);
+        // Get brand-configured token selection rules
+        List<TokenSelectionRule> applicableRules = brandConfiguredRuleService.getTokenSelectionRulesForBrand(brand);
         
         for (TokenSelectionRule rule : applicableRules) {
-            try {
-                String escalationToken = rule.handleTokenFailure(context, customerProfile, failedToken);
-                if (escalationToken != null) {
-                    AuthTokenDefinition escalationTokenDef = findTokenDefinition(escalationToken, brandTokenDefinitions);
-                    if (escalationTokenDef != null && isTokenAvailable(escalationTokenDef, context)) {
-                        logger.debug("Token selection rule '{}' escalated failed token '{}' to '{}' for brand: {}", 
-                                   rule.getRuleName(), failedToken, escalationToken, brand);
-                        return escalationTokenDef;
+            if (rule.isApplicable(context, customerProfile)) {
+                try {
+                    String escalationToken = rule.handleTokenFailure(context, customerProfile, failedToken);
+                    if (escalationToken != null) {
+                        AuthTokenDefinition escalationTokenDef = findTokenDefinition(escalationToken, brandTokenDefinitions);
+                        if (escalationTokenDef != null && isTokenAvailable(escalationTokenDef, context)) {
+                            logger.debug("Brand-configured rule '{}' escalated failed token '{}' to '{}' for brand: {}", 
+                                       rule.getRuleName(), failedToken, escalationToken, brand);
+                            return escalationTokenDef;
+                        }
                     }
+                } catch (Exception e) {
+                    logger.error("Error in brand-configured rule '{}' handling failure for token '{}': {}", 
+                               rule.getRuleName(), failedToken, e.getMessage());
                 }
-            } catch (Exception e) {
-                logger.error("Error in token selection rule '{}' handling failure for token '{}': {}", 
-                           rule.getRuleName(), failedToken, e.getMessage());
             }
         }
         
-        logger.debug("No token selection rules provided escalation for failed token: {} in brand: {}", failedToken, brand);
+        logger.debug("No brand-configured rules provided escalation for failed token: {} in brand: {}", failedToken, brand);
         return null;
     }
     
     /**
-     * Evaluates token selection rules in priority order.
+     * Evaluates brand-configured token selection rules in priority order.
      */
-    private String evaluateTokenSelectionRules(AuthenticationContext context, CustomerProfile customerProfile, String brand) {
-        // Get applicable rules for this brand, sorted by priority
-        List<TokenSelectionRule> applicableRules = getApplicableRules(context, customerProfile, brand);
+    private String evaluateTokenSelectionRules(List<TokenSelectionRule> applicableRules, 
+                                             AuthenticationContext context, 
+                                             CustomerProfile customerProfile, 
+                                             String brand) {
         
         for (TokenSelectionRule rule : applicableRules) {
-            try {
-                String selectedToken = rule.determineNextToken(context, customerProfile);
-                if (selectedToken != null) {
-                    logger.debug("Token selection rule '{}' selected token: {} for brand: {}", 
-                               rule.getRuleName(), selectedToken, brand);
-                    return selectedToken;
+            if (rule.isApplicable(context, customerProfile)) {
+                try {
+                    String selectedToken = rule.determineNextToken(context, customerProfile);
+                    if (selectedToken != null) {
+                        logger.debug("Brand-configured rule '{}' selected token: {} for brand: {}", 
+                                   rule.getRuleName(), selectedToken, brand);
+                        return selectedToken;
+                    }
+                } catch (Exception e) {
+                    logger.error("Error evaluating brand-configured token selection rule '{}': {}", rule.getRuleName(), e.getMessage());
                 }
-            } catch (Exception e) {
-                logger.error("Error evaluating token selection rule '{}': {}", rule.getRuleName(), e.getMessage());
             }
         }
         
         return null;
-    }
-    
-    /**
-     * Gets applicable rules for the current context, filtered by brand and sorted by priority.
-     */
-    private List<TokenSelectionRule> getApplicableRules(AuthenticationContext context, 
-                                                       CustomerProfile customerProfile, 
-                                                       String brand) {
-        List<TokenSelectionRule> applicableRules = new ArrayList<>();
-        
-        // Filter applicable rules
-        for (TokenSelectionRule rule : tokenSelectionRules) {
-            if (isBrandApplicable(rule, brand) && rule.isApplicable(context, customerProfile)) {
-                applicableRules.add(rule);
-            }
-        }
-        
-        // Sort by priority (highest first)
-        Collections.sort(applicableRules, new Comparator<TokenSelectionRule>() {
-            @Override
-            public int compare(TokenSelectionRule r1, TokenSelectionRule r2) {
-                return Integer.compare(r2.getPriority(), r1.getPriority());
-            }
-        });
-        
-        return applicableRules;
-    }
-    
-    /**
-     * Checks if a rule applies to the given brand.
-     */
-    private boolean isBrandApplicable(TokenSelectionRule rule, String brand) {
-        String ruleBrand = rule.getBrand();
-        return "DEFAULT".equals(ruleBrand) || brand.equals(ruleBrand);
     }
     
     /**
@@ -189,7 +160,7 @@ public class TokenSelectionService {
     }
     
     /**
-     * Fallback to priority-based token selection when no rules apply.
+     * Fallback to priority-based token selection when no brand-configured rules apply.
      */
     private AuthTokenDefinition fallbackToPriorityBasedSelection(AuthenticationContext context, 
                                                                List<AuthTokenDefinition> brandTokenDefinitions) {

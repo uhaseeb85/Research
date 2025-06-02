@@ -422,194 +422,408 @@ public class DigitalBankBiometricEligibilityRule implements EligibilityRule {
 }
 ```
 
-## 🎯 Brand Targeting for Rules
+## 🎯 Brand-Configured Rules System
 
-### How to Ensure Rules Apply to Specific Brands
+### Overview
 
-**Critical**: Always implement the `getBrand()` method to control which brands your rule affects:
+The framework now uses a **brand-configured rules approach** where rules are:
+- **Brand-agnostic** by design (no hardcoded brand logic in rules)
+- **Configured per brand** in the brand configuration  
+- **Dynamically loaded** with brand-specific priorities
+- **Reusable across brands** with different priorities and configurations
+
+### How Brand-Configured Rules Work
+
+Instead of rules having `getBrand()` methods, brands configure which rules apply:
 
 ```java
 @Component
-public class DigitalBankAgeRule implements TokenSelectionRule {
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
-    public String getBrand() {
-        return "DIGITAL_BANK";  // Only applies to this specific brand
+    public List<String> getApplicableTokenSelectionRules() {
+        return Arrays.asList(
+            "TRUST_BASED_SECURITY_RULE",        // Shared rule
+            "HIGH_VALUE_CUSTOMER_RULE",         // Shared rule  
+            "DIGITAL_BANK_AGE_RULE",           // Brand-specific rule
+            "DIGITAL_BANK_BIOMETRIC_PREFERENCE" // Brand-specific rule
+        );
     }
     
     @Override
+    public Map<String, Integer> getRulePriorities() {
+        Map<String, Integer> priorities = new HashMap<>();
+        // Same rule, different priorities per brand
+        priorities.put("TRUST_BASED_SECURITY_RULE", 300);
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 250);
+        priorities.put("DIGITAL_BANK_AGE_RULE", 200);
+        return priorities;
+    }
+}
+```
+
+### Creating Brand-Agnostic Rules
+
+Rules are now **completely brand-agnostic** with proper Spring bean names:
+
+```java
+@Component("TRUST_BASED_SECURITY_RULE")  // Spring bean name
+public class TrustBasedSecurityRule implements TokenSelectionRule {
+    
+    @Override
     public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
-        // Your brand-specific logic here
-        if (profile.getAge() < 30) {
-            return "FACE_ID";
+        TrustLevelInfo trustInfo = context.getTrustLevelInfo();
+        
+        if (trustInfo != null && "RED".equals(trustInfo.getTrustLevel())) {
+            // Low trust - force full SSN authentication
+            if (context.getEligibleTokens().contains("SSN_FULL") && 
+                context.canReAskToken("SSN_FULL")) {
+                return "SSN_FULL";
+            }
+        }
+        
+        return null; // Let other rules handle
+    }
+    
+    @Override
+    public int getPriority() {
+        return 250; // Default priority, overridden by brand config
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Always DEFAULT for brand-agnostic rules
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "TRUST_BASED_SECURITY_RULE"; // Match Spring bean name
+    }
+}
+```
+
+### Multi-Brand Rule Configuration Examples
+
+#### Example 1: Same Rule, Different Priorities
+
+```java
+// Digital Bank Configuration with static collections
+@Component
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 250); // Higher priority
+        RULE_PRIORITIES = priorities;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+}
+
+// Community Bank Configuration with static collections  
+@Component
+public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 150); // Lower priority
+        RULE_PRIORITIES = priorities;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+}
+```
+
+#### Example 2: Shared Rules Across Brands
+
+```java
+// Brand-agnostic rule that both banks can use
+@Component("TRUST_BASED_SECURITY_RULE")
+public class TrustBasedSecurityRule implements TokenSelectionRule {
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Always DEFAULT for shared rules
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "TRUST_BASED_SECURITY_RULE"; // Match Spring bean name
+    }
+    
+    // Implementation details...
+}
+
+// Digital Bank enables it with high priority
+@Component
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE" // Configured with priority 300
+    );
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+}
+
+// Community Bank enables it with lower priority  
+@Component
+public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE" // Configured with priority 200
+    );
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+}
+```
+
+#### Example 3: Brand-Specific Rules
+
+```java
+// Rule that only makes sense for Premium Bank
+@Component("PREMIUM_BANK_VOICE_BIOMETRIC_RULE")
+public class VoiceBiometricRule implements TokenSelectionRule {
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Still DEFAULT, but only Premium Bank configures it
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "PREMIUM_BANK_VOICE_BIOMETRIC_RULE";
+    }
+    
+    // Voice biometric specific implementation...
+}
+
+// Only Premium Bank configures this rule
+@Component  
+public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE",           // Shared rule
+        "HIGH_VALUE_CUSTOMER_RULE",            // Shared rule  
+        "PREMIUM_BANK_VOICE_BIOMETRIC_RULE"    // Brand-specific rule
+    );
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+}
+```
+
+### Benefits of Brand-Configured Rules
+
+| **Old Approach** | **New Approach** |
+|------------------|------------------|
+| Rules hardcode brand logic | Rules are completely brand-agnostic |
+| Same rule, different brands = duplicate code | Same rule reused across brands |
+| Priority fixed in rule code | Priority configured per brand |
+| Hard to share rules | Easy to share rules |
+| Must create new rule per brand | Configure existing rules per brand |
+
+### Configuration Methods
+
+```java
+public interface BrandAuthConfiguration {
+    
+    // TOKEN SELECTION RULES
+    List<String> getApplicableTokenSelectionRules();  // Which rules to use
+    
+    // ELIGIBILITY RULES  
+    List<String> getApplicableEligibilityRules();     // Which rules to use
+    
+    // POST-VALIDATION RULES
+    List<String> getApplicablePostValidationRules();  // Which rules to use
+    
+    // RULE PRIORITIES
+    Map<String, Integer> getRulePriorities();         // Override rule priorities
+    
+    // RULE STATUS
+    boolean isRuleEnabled(String ruleName);           // Check if rule enabled
+}
+```
+
+### 🚀 Quick Start: Brand-Configured Rules
+
+#### Step 1: Create Brand-Agnostic Rules
+
+```java
+@Component("TRUST_BASED_SECURITY_RULE")
+public class TrustBasedSecurityRule implements TokenSelectionRule {
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
+        TrustLevelInfo trustInfo = context.getTrustLevelInfo();
+        
+        if (trustInfo != null && "RED".equals(trustInfo.getTrustLevel())) {
+            // Low trust - force full SSN authentication
+            if (context.getEligibleTokens().contains("SSN_FULL") && 
+                context.canReAskToken("SSN_FULL")) {
+                return "SSN_FULL";
+            }
+        }
+        
+        return null; // Let other rules handle
+    }
+    
+    @Override
+    public int getPriority() {
+        return 250; // Default priority, overridden by brand config
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Always DEFAULT for brand-agnostic rules
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "TRUST_BASED_SECURITY_RULE"; // Match Spring bean name
+    }
+}
+
+@Component("HIGH_VALUE_CUSTOMER_RULE")
+public class HighValueCustomerRule implements TokenSelectionRule {
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
+        if (isHighValueCustomer(profile)) {
+            // Prefer mobile PIN for high-value customers
+            if (context.getEligibleTokens().contains("MOBILE_PIN") && 
+                context.canReAskToken("MOBILE_PIN")) {
+                return "MOBILE_PIN";
+            }
         }
         return null;
     }
     
+    private boolean isHighValueCustomer(CustomerProfile profile) {
+        // Employee ID or premium account status indicates high-value customer
+        return (profile.getEmployeeId() != null && !profile.getEmployeeId().trim().isEmpty()) ||
+               "PREMIUM".equals(profile.getAccountStatus()) || 
+               "VIP".equals(profile.getAccountStatus());
+    }
+    
     @Override
     public int getPriority() {
-        return 200;
+        return 200; // Default priority, overridden by brand config
+    }
+    
+    @Override
+    public String getBrand() {
+        return "DEFAULT"; // Always DEFAULT for brand-agnostic rules
+    }
+    
+    @Override
+    public String getRuleName() {
+        return "HIGH_VALUE_CUSTOMER_RULE";
     }
 }
 ```
 
-### Brand Targeting Options
-
-| getBrand() Return Value | Effect |
-|------------------------|--------|
-| `"DIGITAL_BANK"` | Only applies to DIGITAL_BANK customers |
-| `"PREMIUM_BANK"` | Only applies to PREMIUM_BANK customers |
-| `"DEFAULT"` | Applies to ALL brands as fallback |
-
-### Rule Execution Logic
-
-The framework filters rules by brand during execution:
-
-1. **Brand-specific rules** (exact brand match) execute first by priority
-2. **DEFAULT rules** execute as fallback if no brand-specific rule returns a token
-3. **First rule to return a token wins** - remaining rules are skipped
-
-```java
-// Example execution for "DIGITAL_BANK" customer:
-// 1. DigitalBankTrustRule (brand: "DIGITAL_BANK", priority: 250) → returns "SSN_LAST_4" ✅ STOPS
-// 2. DigitalBankAgeRule (brand: "DIGITAL_BANK", priority: 200) → ❌ NEVER EXECUTED
-// 3. DefaultTokenRule (brand: "DEFAULT", priority: 100) → ❌ NEVER EXECUTED
-```
-
-### Multiple Brand Support
-
-To support multiple brands, create separate rule classes:
+#### Step 2: Configure Rules Per Brand with Static Collections
 
 ```java
 @Component
-public class DigitalBankMobileFirstRule implements TokenSelectionRule {
-    public String getBrand() { return "DIGITAL_BANK"; }
-    // Digital Bank specific logic
+public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    // Static rule configurations for performance
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE",        // Priority: 300 (security first)
+        "HIGH_VALUE_CUSTOMER_RULE",         // Priority: 250 (shared rule)
+        "DIGITAL_BANK_AGE_RULE",           // Priority: 200 (brand-specific)
+        "DIGITAL_BANK_BIOMETRIC_PREFERENCE" // Priority: 180 (brand-specific)
+    );
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("TRUST_BASED_SECURITY_RULE", 300);
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 250);
+        priorities.put("DIGITAL_BANK_AGE_RULE", 200);
+        priorities.put("DIGITAL_BANK_BIOMETRIC_PREFERENCE", 180);
+        RULE_PRIORITIES = priorities;
+    }
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+    
+    // ... other configuration methods
 }
 
-@Component  
-public class CommunityBankSimpleRule implements TokenSelectionRule {
-    public String getBrand() { return "COMMUNITY_BANK"; }
-    // Community Bank specific logic  
+@Component
+public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
+    
+    // Static rule configurations for performance
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE",     // Security first, but lower priority
+        "HIGH_VALUE_CUSTOMER_RULE"       // Simple high-value detection
+    );
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("TRUST_BASED_SECURITY_RULE", 200);  // Lower priority than digital bank
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 150);   // Conservative approach
+        RULE_PRIORITIES = priorities;
+    }
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+    
+    // ... other configuration methods
 }
 ```
+
+#### Step 3: Results
+
+With this configuration:
+
+- **Digital Bank**: Modern biometric-first approach with sophisticated rules
+- **Community Bank**: Traditional conservative approach with basic security  
+- **Same Rules**: Both banks use shared rules but with different priorities
+- **Performance**: Static collections avoid object creation on every call
+- **Easy Maintenance**: Update one rule, benefits all configured banks
+
+**Rule Execution for high-value customer:**
+
+| Bank | Rule Execution Order | Selected Token |
+|------|---------------------|----------------|
+| Digital Bank | 1. TRUST_BASED_SECURITY_RULE (300)<br>2. HIGH_VALUE_CUSTOMER_RULE (250) ✅ | MOBILE_PIN |
+| Community Bank | 1. TRUST_BASED_SECURITY_RULE (200)<br>2. HIGH_VALUE_CUSTOMER_RULE (150) | SSN |
 
 ## 📡 API Endpoints
 
 ### Authentication
-```http
-POST /api/v1/auth/customer
-Content-Type: application/json
-
-{
-  "sessionId": "session-123",
-  "customerIdentifier": {
-    "type": "PHONE_NUMBER",
-    "value": "+1234567890"
-  },
-  "brand": "DIGITAL_BANK",
-  "trustLevelInfo": {
-    "trustLevel": "GREEN",
-    "phoneMatchStatus": "SINGLE_MATCH",
-    "matchedSsnCount": 1
-  }
-}
-```
-
-### Brand Information
-```http
-GET /api/v1/auth/methods/DIGITAL_BANK    # Get authentication methods
-GET /api/v1/auth/brands                  # Get all supported brands
-```
-
-### DNIS Configuration
-```http
-GET /api/v1/auth/dnis/18005551111        # Get specific DNIS config
-GET /api/v1/auth/dnis                    # Get all DNIS configurations
-```
-
-## 🚨 Best Practices & Common Pitfalls
-
-### ✅ Best Practices
-```java
-// DO: Keep validators simple and focused
-    @Override
-public boolean validate(String customerId, String value, CustomerProfile profile) {
-    return BCrypt.checkpw(value, profile.getStoredHash());
-}
-
-// DO: Use meaningful rule priorities
-    public int getPriority() {
-    return 200; // Higher than default (100), lower than critical security (300)
-    }
-    
-// DO: Be explicit about brand targeting
-    public String getBrand() {
-    return "DIGITAL_BANK"; // Specific brand only
-}
-
-// DO: Handle edge cases gracefully
-if (customerProfile.getAge() == null) {
-    return null; // Let other rules handle
-}
-```
-
-### ❌ Common Pitfalls
-```java
-// DON'T: Hard-code brand logic in validators
-if (brand.equals("DIGITAL_BANK") && someCondition) {
-    // This creates tight coupling
-}
-
-// DON'T: Use low priorities that never execute
-    public int getPriority() {
-    return 1; // Will be overridden by everything
-    }
-    
-// DON'T: Apply rules to all brands unintentionally
-    public String getBrand() {
-    return "DEFAULT"; // Affects ALL brands
-}
-
-// DON'T: Ignore null safety
-customerProfile.getAge() < 30; // NPE if age is null
-```
-
-## 🧪 Testing Strategy
-
-### Test Categories
-1. **Unit Tests** - Individual component testing
-2. **Integration Tests** - Full authentication flows
-3. **Brand-Specific Tests** - Custom token and rule testing
-4. **DNIS Tests** - Phone number routing scenarios
-5. **Security Tests** - Failed token and attack scenarios
-
-### Essential Test Scenarios
-- **Happy path**: Normal authentication flow
-- **Multi-factor**: High-value customer scenarios  
-- **Trust levels**: RED vs GREEN trust handling
-- **Failed tokens**: Invalid input handling
-- **DNIS routing**: Different phone number behaviors
-- **Rule conflicts**: Multiple rules interaction
-
-## 📊 Monitoring & Observability
-
-The framework provides comprehensive logging:
-
-```java
-// Authentication flow tracking
-logger.info("Brand: {}, Customer: {}, Token: {}, Result: {}", 
-           brand, customerId, tokenName, result);
-
-// Rule execution monitoring
-logger.debug("Rule '{}' executed for brand '{}' with priority {}", 
-            ruleName, brand, priority);
-
-// Performance metrics
-logger.debug("Authentication completed in {}ms for brand '{}'", 
-            duration, brand);
-
-// Security events
-logger.warn("Multiple failed attempts for customer: {}, brand: {}", 
-           customerId, brand);
 ```
