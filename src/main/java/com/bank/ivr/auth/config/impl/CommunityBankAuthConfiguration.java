@@ -87,6 +87,29 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
         BRAND_MESSAGES = messages;
     }
     
+    // Static rule configurations for performance
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE",     // Security first, but lower priority
+        "HIGH_VALUE_CUSTOMER_RULE"       // Simple high-value detection
+    );
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("TRUST_BASED_SECURITY_RULE", 200);  // Security important but not overwhelming
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 150);   // Moderate priority for high-value customers
+        RULE_PRIORITIES = priorities;
+    }
+    
+    private static final List<String> APPLICABLE_POST_VALIDATION_RULES = Arrays.asList(
+        "BASIC_SECURITY_CHECK_RULE"
+    );
+    
+    private static final List<String> APPLICABLE_ELIGIBILITY_RULES = Arrays.asList(
+        "BASIC_ELIGIBILITY_RULE",
+        "ACCOUNT_STATUS_ELIGIBILITY_RULE"
+    );
+    
     @Override
     public String getBrandCode() {
         return "COMMUNITY_BANK";
@@ -120,5 +143,27 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
     public int getPriority() {
         return 50; // Medium priority configuration
+    }
+    
+    // NEW RULE CONFIGURATION METHODS
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+    
+    @Override
+    public List<String> getApplicablePostValidationRules() {
+        return APPLICABLE_POST_VALIDATION_RULES;
+    }
+    
+    @Override
+    public List<String> getApplicableEligibilityRules() {
+        return APPLICABLE_ELIGIBILITY_RULES;
     }
 }

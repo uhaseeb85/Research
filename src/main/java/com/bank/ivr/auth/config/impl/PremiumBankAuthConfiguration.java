@@ -87,6 +87,33 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
         BRAND_MESSAGES = messages;
     }
     
+    // Static rule configurations for performance
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+        "TRUST_BASED_SECURITY_RULE",       // Priority: 350 (enhanced security for premium)
+        "HIGH_VALUE_CUSTOMER_RULE",        // Priority: 300 (all premium customers are high-value)
+        "PREMIUM_BANK_VOICE_BIOMETRIC_RULE" // Priority: 250 (brand-specific voice preference)
+    );
+    
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    static {
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("TRUST_BASED_SECURITY_RULE", 350);
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 300);
+        priorities.put("PREMIUM_BANK_VOICE_BIOMETRIC_RULE", 250);
+        RULE_PRIORITIES = priorities;
+    }
+    
+    private static final List<String> APPLICABLE_POST_VALIDATION_RULES = Arrays.asList(
+        "HIGH_VALUE_SECURITY_RULE",
+        "PREMIUM_BANK_COMPLIANCE_RULE",
+        "VOICE_BIOMETRIC_VERIFICATION_RULE"
+    );
+    
+    private static final List<String> APPLICABLE_ELIGIBILITY_RULES = Arrays.asList(
+        "VOICE_BIOMETRIC_ELIGIBILITY_RULE",
+        "PREMIUM_CUSTOMER_ELIGIBILITY_RULE"
+    );
+    
     @Override
     public String getBrandCode() {
         return "PREMIUM_BANK";
@@ -120,5 +147,26 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
     public int getPriority() {
         return 100; // High priority configuration
+    }
+
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+    
+    @Override
+    public List<String> getApplicablePostValidationRules() {
+        return APPLICABLE_POST_VALIDATION_RULES;
+    }
+    
+    @Override
+    public List<String> getApplicableEligibilityRules() {
+        return APPLICABLE_ELIGIBILITY_RULES;
     }
 }
