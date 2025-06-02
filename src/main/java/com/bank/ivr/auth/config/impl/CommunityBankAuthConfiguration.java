@@ -61,17 +61,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
                 .build()
     );
     
-    private static final Map<String, Integer> BRAND_SPECIFIC_TOKEN_ATTEMPTS;
-    static {
-        Map<String, Integer> attempts = new HashMap<>();
-        attempts.put("SSN", 3);
-        attempts.put("DATE_OF_BIRTH", 3);
-        attempts.put("MOTHER_MAIDEN_NAME", 3);
-        attempts.put("DEBIT_CARD_PIN", 3);
-        attempts.put("ACCOUNT_OPENING_DATE", 3);
-        BRAND_SPECIFIC_TOKEN_ATTEMPTS = attempts;
-    }
-    
     private static final Map<String, String> BRAND_MESSAGES;
     static {
         Map<String, String> messages = new HashMap<>();
@@ -127,7 +116,12 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public Map<String, Integer> getBrandSpecificTokenAttempts() {
-        return BRAND_SPECIFIC_TOKEN_ATTEMPTS;
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
     
     @Override

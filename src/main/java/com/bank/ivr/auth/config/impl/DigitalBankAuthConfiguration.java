@@ -100,7 +100,12 @@ public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public Map<String, Integer> getBrandSpecificTokenAttempts() {
-        return new HashMap<>(); // Use token definition defaults
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
     
     @Override
