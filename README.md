@@ -124,14 +124,17 @@ Security:
 @Component
 public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     
-    @Override
-    public String getBrandCode() {
-        return "DIGITAL_BANK";
-    }
+    // Static collections for performance optimization
+    private static final List<AuthTokenDefinition> TOKEN_DEFINITIONS;
+    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES;
+    private static final List<String> APPLICABLE_ELIGIBILITY_RULES;
+    private static final List<String> APPLICABLE_POST_VALIDATION_RULES;
+    private static final Map<String, Integer> RULE_PRIORITIES;
+    private static final Map<String, String> BRAND_MESSAGES;
     
-    @Override
-    public List<AuthTokenDefinition> getTokenDefinitions() {
-        return Arrays.asList(
+    static {
+        // Initialize token definitions
+        TOKEN_DEFINITIONS = Arrays.asList(
             // Modern biometric - highest priority, no retries
             AuthTokenDefinition.builder()
                 .name("FACE_ID")
@@ -159,7 +162,86 @@ public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
                 .inputFormatRegex("^\\d{4}$")
                 .build()
         );
+        
+        // Configure which rules apply to this brand
+        APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
+            "TRUST_BASED_SECURITY_RULE",        // Security first (Priority: 300)
+            "HIGH_VALUE_CUSTOMER_RULE",         // High-value customer logic (Priority: 250)
+            "DIGITAL_BANK_AGE_RULE",           // Brand-specific age-based preference (Priority: 200)
+            "DIGITAL_BANK_BIOMETRIC_PREFERENCE" // Brand-specific biometric preference (Priority: 180)
+        );
+        
+        APPLICABLE_ELIGIBILITY_RULES = Arrays.asList(
+            "DIGITAL_BANK_BIOMETRIC_ELIGIBILITY_RULE",
+            "STANDARD_SSN_ELIGIBILITY_RULE"
+        );
+        
+        APPLICABLE_POST_VALIDATION_RULES = Arrays.asList(
+            "DIGITAL_BANK_SECURITY_RULE",
+            "HIGH_VALUE_ADDITIONAL_AUTH_RULE"
+        );
+        
+        // Configure rule priorities (overrides default rule priorities)
+        Map<String, Integer> priorities = new HashMap<>();
+        priorities.put("TRUST_BASED_SECURITY_RULE", 300);        // Security always first
+        priorities.put("HIGH_VALUE_CUSTOMER_RULE", 250);         // High-value customers second
+        priorities.put("DIGITAL_BANK_AGE_RULE", 200);           // Age-based preferences third
+        priorities.put("DIGITAL_BANK_BIOMETRIC_PREFERENCE", 180); // Biometric preference fourth
+        priorities.put("DIGITAL_BANK_SECURITY_RULE", 150);       // Post-validation security
+        priorities.put("HIGH_VALUE_ADDITIONAL_AUTH_RULE", 100);  // Additional auth requirements
+        RULE_PRIORITIES = priorities;
+        
+        // Brand-specific messages
+        Map<String, String> messages = new HashMap<>();
+        messages.put("welcome", "Welcome to Digital Bank. Please authenticate using your preferred method.");
+        messages.put("failure", "Authentication failed. Please visit our mobile app or call customer service.");
+        messages.put("no_methods", "No authentication methods available. Please update your profile in our mobile app.");
+        messages.put("customer_not_found", "Customer profile not found. Please verify your information.");
+        messages.put("session_expired", "Your session has expired. Please call again to restart authentication.");
+        BRAND_MESSAGES = messages;
     }
+    
+    @Override
+    public String getBrandCode() {
+        return "DIGITAL_BANK";
+    }
+    
+    @Override
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return TOKEN_DEFINITIONS;
+    }
+    
+    // ============= RULE CONFIGURATION METHODS =============
+    
+    @Override
+    public List<String> getApplicableTokenSelectionRules() {
+        return APPLICABLE_TOKEN_SELECTION_RULES;
+    }
+    
+    @Override
+    public List<String> getApplicableEligibilityRules() {
+        return APPLICABLE_ELIGIBILITY_RULES;
+    }
+    
+    @Override
+    public List<String> getApplicablePostValidationRules() {
+        return APPLICABLE_POST_VALIDATION_RULES;
+    }
+    
+    @Override
+    public Map<String, Integer> getRulePriorities() {
+        return RULE_PRIORITIES;
+    }
+    
+    @Override
+    public boolean isRuleEnabled(String ruleName) {
+        // All configured rules are enabled by default
+        return APPLICABLE_TOKEN_SELECTION_RULES.contains(ruleName) ||
+               APPLICABLE_ELIGIBILITY_RULES.contains(ruleName) ||
+               APPLICABLE_POST_VALIDATION_RULES.contains(ruleName);
+    }
+    
+    // ============= BRAND SETTINGS =============
     
     @Override
     public int getMaxOverallAttempts() {
@@ -173,13 +255,7 @@ public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public Map<String, String> getBrandMessages() {
-        Map<String, String> messages = new HashMap<>();
-        messages.put("welcome", "Welcome to Digital Bank. Please authenticate using your preferred method.");
-        messages.put("failure", "Authentication failed. Please visit our mobile app or call customer service.");
-        messages.put("no_methods", "No authentication methods available. Please update your profile in our mobile app.");
-        messages.put("customer_not_found", "Customer profile not found. Please verify your information.");
-        messages.put("session_expired", "Your session has expired. Please call again to restart authentication.");
-        return messages;
+        return BRAND_MESSAGES;
     }
 }
 ```
