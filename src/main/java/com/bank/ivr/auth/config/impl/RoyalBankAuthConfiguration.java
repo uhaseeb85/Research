@@ -80,8 +80,9 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
     // Static rule configurations for performance
     private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
         "TRUST_BASED_SECURITY_RULE",     // Highest priority - core to Royal Bank strategy
+        "ROYAL_BANK_TRUST_LEVEL_RULE",   // Brand-specific trust level logic (updated name)
         "HIGH_VALUE_CUSTOMER_RULE",      // High-value customer handling
-        "ROYAL_BANK_TRUST_LEVEL_RULE"    // Brand-specific trust level logic
+        "FULL_AUTHENTICATION_COMPLETION_RULE" // Completion checking
     );
     
     private static final Map<String, Integer> RULE_PRIORITIES;
@@ -90,6 +91,7 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
         priorities.put("TRUST_BASED_SECURITY_RULE", 350);      // Highest priority - trust is everything
         priorities.put("ROYAL_BANK_TRUST_LEVEL_RULE", 300);    // Brand-specific trust logic
         priorities.put("HIGH_VALUE_CUSTOMER_RULE", 250);       // High-value customer handling
+        priorities.put("FULL_AUTHENTICATION_COMPLETION_RULE", 1000); // Completion checking
         RULE_PRIORITIES = priorities;
     }
     

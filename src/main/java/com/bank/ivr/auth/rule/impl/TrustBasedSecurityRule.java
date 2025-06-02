@@ -18,20 +18,37 @@ public class TrustBasedSecurityRule implements TokenSelectionRule {
     public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
         TrustLevelInfo trustInfo = context.getTrustLevelInfo();
         
-        if (trustInfo != null && "RED".equals(trustInfo.getTrustLevel())) {
-            // Low trust - force full SSN authentication
+        if (trustInfo != null && trustInfo.isLowTrust()) {
+            // Low trust - enforce stronger authentication
+            
+            // Check if we already tried all SSN-based tokens and they failed
+            if (context.isTokenFailed("SSN_FULL") && context.isTokenFailed("SSN") && context.isTokenFailed("SSN_LAST_4")) {
+                return null; // Give up after all SSN attempts fail - let other rules handle
+            }
+            
+            // Try full SSN first if available and not failed
             if (context.getEligibleTokens().contains("SSN_FULL") && 
-                context.canReAskToken("SSN_FULL")) {
+                context.canReAskToken("SSN_FULL") && 
+                !context.isTokenFailed("SSN_FULL")) {
                 return "SSN_FULL";
             }
-            // Fallback to SSN if full not available
+            
+            // If full SSN failed/unavailable, try regular SSN
             if (context.getEligibleTokens().contains("SSN") && 
-                context.canReAskToken("SSN")) {
+                context.canReAskToken("SSN") && 
+                !context.isTokenFailed("SSN")) {
                 return "SSN";
+            }
+            
+            // If regular SSN also failed, try last 4 digits as emergency fallback
+            if (context.getEligibleTokens().contains("SSN_LAST_4") && 
+                context.canReAskToken("SSN_LAST_4") && 
+                !context.isTokenFailed("SSN_LAST_4")) {
+                return "SSN_LAST_4";
             }
         }
         
-        return null; // Let other rules handle normal trust scenarios
+        return null; // Let other rules handle normal trust scenarios or rule exhausted options
     }
     
     @Override
@@ -43,7 +60,7 @@ public class TrustBasedSecurityRule implements TokenSelectionRule {
     @Override
     public boolean isApplicable(AuthenticationContext context, CustomerProfile customerProfile) {
         TrustLevelInfo trustInfo = context.getTrustLevelInfo();
-        return trustInfo != null && "RED".equals(trustInfo.getTrustLevel());
+        return trustInfo != null && trustInfo.isLowTrust();
     }
     
     @Override

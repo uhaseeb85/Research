@@ -18,20 +18,42 @@ public class HighValueCustomerRule implements TokenSelectionRule {
     @Override
     public String determineNextToken(AuthenticationContext context, CustomerProfile customerProfile) {
         if (isHighValueCustomer(customerProfile)) {
-            // Prefer mobile PIN for high-value customers (more secure than basic tokens)
+            // Progressive escalation for high-value customers
+            // Start with most convenient, escalate to more secure methods
+            
+            // First preference: Mobile PIN (convenient and secure)
             if (context.getEligibleTokens().contains("MOBILE_PIN") && 
-                context.canReAskToken("MOBILE_PIN")) {
+                context.canReAskToken("MOBILE_PIN") && 
+                !context.isTokenFailed("MOBILE_PIN")) {
                 return "MOBILE_PIN";
             }
             
-            // Fallback to debit card PIN
+            // Second preference: Debit Card PIN (if mobile PIN failed/unavailable)
             if (context.getEligibleTokens().contains("DEBIT_CARD_PIN") && 
-                context.canReAskToken("DEBIT_CARD_PIN")) {
+                context.canReAskToken("DEBIT_CARD_PIN") && 
+                !context.isTokenFailed("DEBIT_CARD_PIN")) {
                 return "DEBIT_CARD_PIN";
             }
+            
+            // Third preference: Voice biometric (premium feature for high-value customers)
+            if (context.getEligibleTokens().contains("VOICE_BIOMETRIC") && 
+                context.canReAskToken("VOICE_BIOMETRIC") && 
+                !context.isTokenFailed("VOICE_BIOMETRIC")) {
+                return "VOICE_BIOMETRIC";
+            }
+            
+            // Final fallback: Face ID biometric (if available)
+            if (context.getEligibleTokens().contains("FACE_ID") && 
+                context.canReAskToken("FACE_ID") && 
+                !context.isTokenFailed("FACE_ID")) {
+                return "FACE_ID";
+            }
+            
+            // If all high-value preferred methods exhausted, let other rules handle
+            // (e.g., trust-based rules might force SSN for security)
         }
         
-        return null; // Let other rules or default priority handle
+        return null; // Let other rules or default priority handle non-high-value customers or exhausted options
     }
     
     @Override
