@@ -61,17 +61,6 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
                 .build()
     );
     
-    private static final Map<String, Integer> BRAND_SPECIFIC_TOKEN_ATTEMPTS;
-    static {
-        Map<String, Integer> attempts = new HashMap<>();
-        attempts.put("SSN", 2); // Override to be more restrictive
-        attempts.put("DEBIT_CARD_PIN", 3);
-        attempts.put("DATE_OF_BIRTH", 3);
-        attempts.put("MOTHER_MAIDEN_NAME", 2);
-        attempts.put("VOICE_BIOMETRIC", 2);
-        BRAND_SPECIFIC_TOKEN_ATTEMPTS = attempts;
-    }
-    
     private static final Map<String, String> BRAND_MESSAGES;
     static {
         Map<String, String> messages = new HashMap<>();
@@ -131,7 +120,12 @@ public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public Map<String, Integer> getBrandSpecificTokenAttempts() {
-        return BRAND_SPECIFIC_TOKEN_ATTEMPTS;
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
     
     @Override

@@ -133,7 +133,7 @@ public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     private static final Map<String, String> BRAND_MESSAGES;
     
     static {
-        // Initialize token definitions
+        // Initialize token definitions with brand-specific priorities and attempt limits
         TOKEN_DEFINITIONS = Arrays.asList(
             // Modern biometric - highest priority, no retries
             AuthTokenDefinition.builder()
@@ -246,6 +246,16 @@ public class DigitalBankAuthConfiguration implements BrandAuthConfiguration {
     @Override
     public int getMaxOverallAttempts() {
         return 3;  // Strict security for digital bank
+    }
+    
+    @Override
+    public Map<String, Integer> getBrandSpecificTokenAttempts() {
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
     
     @Override
@@ -691,15 +701,33 @@ public class VoiceBiometricRule implements TokenSelectionRule {
 @Component  
 public class PremiumBankAuthConfiguration implements BrandAuthConfiguration {
     
-    private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
-        "TRUST_BASED_SECURITY_RULE",           // Shared rule
-        "HIGH_VALUE_CUSTOMER_RULE",            // Shared rule  
-        "PREMIUM_BANK_VOICE_BIOMETRIC_RULE"    // Brand-specific rule
+    private static final List<AuthTokenDefinition> TOKEN_DEFINITIONS = Arrays.asList(
+        AuthTokenDefinition.builder()
+                .name("DEBIT_CARD_PIN")
+                .priority(100)
+                .maxAttempts(3) // Premium Bank's PIN policy
+                .build(),
+                
+        AuthTokenDefinition.builder()
+                .name("SSN")
+                .priority(95)
+                .maxAttempts(2) // Premium Bank's SSN policy (stricter)
+                .build()
     );
     
     @Override
-    public List<String> getApplicableTokenSelectionRules() {
-        return APPLICABLE_TOKEN_SELECTION_RULES;
+    public List<AuthTokenDefinition> getTokenDefinitions() {
+        return TOKEN_DEFINITIONS;
+    }
+    
+    @Override
+    public Map<String, Integer> getBrandSpecificTokenAttempts() {
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
 }
 ```

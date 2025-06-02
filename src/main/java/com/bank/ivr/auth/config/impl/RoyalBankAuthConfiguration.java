@@ -11,78 +11,67 @@ import com.bank.ivr.auth.config.BrandAuthConfiguration;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 
 /**
- * Configuration for Royal Bank - trust-level-based authentication strategy.
- * Adapts authentication requirements based on customer trust level.
+ * Authentication configuration for Royal Bank brand.
+ * Trust-level-based authentication with SSN variants.
  */
 @Component
 public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
     
     private static final List<AuthTokenDefinition> TOKEN_DEFINITIONS = Arrays.asList(
-        // SSN Last 4 Digits - for high trust scenarios
+        // Royal Bank uses different SSN approaches based on trust level
         AuthTokenDefinition.builder()
-            .name("SSN_LAST_4")
-            .description("Last 4 digits of Social Security Number")
-            .priority(100)
-            .maxAttempts(2)
-            .inputFormatRegex("\\d{4}")
-            .build(),
-            
-        // Full SSN - for low trust or high risk scenarios
-        AuthTokenDefinition.builder()
-            .name("SSN_FULL")
-            .description("Complete Social Security Number")
-            .priority(90)
-            .maxAttempts(2)
-            .inputFormatRegex("\\d{3}-?\\d{2}-?\\d{4}")
-            .build(),
-            
-        // Debit Card PIN - alternative authentication method
-        AuthTokenDefinition.builder()
-            .name("DEBIT_CARD_PIN")
-            .description("Debit Card PIN")
-            .priority(80)
-            .maxAttempts(3)
-            .inputFormatRegex("^\\d{4}$")
-            .build(),
+                .name("SSN_FULL")
+                .description("Full Social Security Number")
+                .priority(100)
+                .inputFormatRegex("^\\d{9}$|^\\d{3}-\\d{2}-\\d{4}$")
+                .maxAttempts(2)
+                .build(),
         
-        // Date of Birth - fallback option
         AuthTokenDefinition.builder()
-            .name("DATE_OF_BIRTH")
-            .description("Date of Birth")
-            .priority(70)
-            .maxAttempts(2)
-            .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
-            .build()
+                .name("SSN_LAST_4")
+                .description("Last 4 digits of Social Security Number")
+                .priority(90)
+                .inputFormatRegex("^\\d{4}$")
+                .maxAttempts(3)
+                .build(),
+        
+        AuthTokenDefinition.builder()
+                .name("DEBIT_CARD_PIN")
+                .description("Debit Card PIN")
+                .priority(80)
+                .inputFormatRegex("^\\d{4}$")
+                .maxAttempts(3)
+                .build(),
+        
+        AuthTokenDefinition.builder()
+                .name("DATE_OF_BIRTH")
+                .description("Date of Birth")
+                .priority(70)
+                .inputFormatRegex("^\\d{2}/\\d{2}/\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$")
+                .maxAttempts(3)
+                .build()
     );
 
-    private static final Map<String, Integer> BRAND_SPECIFIC_TOKEN_ATTEMPTS;
-    static {
-        Map<String, Integer> attempts = new HashMap<>();
-        attempts.put("SSN_LAST_4", 2);
-        attempts.put("SSN_FULL", 2);
-        attempts.put("DEBIT_CARD_PIN", 3);
-        attempts.put("DATE_OF_BIRTH", 2);
-        BRAND_SPECIFIC_TOKEN_ATTEMPTS = attempts;
-    }
-    
     private static final Map<String, String> BRAND_MESSAGES;
     static {
         Map<String, String> messages = new HashMap<>();
-        messages.put("SSN_LAST_4_PROMPT", "For security purposes, please provide the last 4 digits of your Social Security Number.");
-        messages.put("SSN_FULL_PROMPT", "For additional verification, please provide your complete Social Security Number.");
-        messages.put("TRUST_LEVEL_HIGH", "Your phone number has been verified with high confidence.");
-        messages.put("TRUST_LEVEL_LOW", "Additional verification is required for your phone number.");
-        messages.put("PHONE_MATCH_MULTIPLE", "Your phone number is associated with multiple accounts. Additional verification is required.");
-        messages.put("PHONE_MATCH_NONE", "Your phone number could not be matched with our records. Additional verification is required.");
+        messages.put("welcome", "Welcome to Royal Bank. We use advanced security to protect your account.");
+        messages.put("primary_prompt", "For your security, please provide your {token_description}.");
+        messages.put("secondary_prompt", "Thank you. Please also provide your {token_description} for verification.");
+        messages.put("success", "Authentication successful. Welcome to Royal Banking!");
+        messages.put("failure", "Authentication failed. Please contact Royal Bank Customer Service at 1-800-ROYAL.");
+        messages.put("customer_not_found", "Account not found. Please verify your information or contact Royal Bank Customer Service.");
+        messages.put("session_expired", "Your secure session has expired. Please restart the authentication process.");
+        messages.put("system_error", "System error encountered. Please try again or contact Royal Bank Customer Service.");
+        messages.put("no_methods", "No authentication methods available. Please contact Royal Bank Customer Service at 1-800-ROYAL.");
         BRAND_MESSAGES = messages;
     }
-
-    // Static rule configurations for performance
+    
+    // Static rule configurations for performance optimization
     private static final List<String> APPLICABLE_TOKEN_SELECTION_RULES = Arrays.asList(
-        "TRUST_BASED_SECURITY_RULE",     // Highest priority - core to Royal Bank strategy
-        "ROYAL_BANK_TRUST_LEVEL_RULE",   // Brand-specific trust level logic (updated name)
-        "HIGH_VALUE_CUSTOMER_RULE",      // High-value customer handling
-        "FULL_AUTHENTICATION_COMPLETION_RULE" // Completion checking
+        "TRUST_BASED_SECURITY_RULE",      // Priority: 350 (highest - trust is everything)
+        "ROYAL_BANK_TRUST_LEVEL_RULE",    // Priority: 300 (brand-specific trust logic)
+        "HIGH_VALUE_CUSTOMER_RULE"        // Priority: 250 (high-value customer handling)
     );
     
     private static final Map<String, Integer> RULE_PRIORITIES;
@@ -124,7 +113,12 @@ public class RoyalBankAuthConfiguration implements BrandAuthConfiguration {
     
     @Override
     public Map<String, Integer> getBrandSpecificTokenAttempts() {
-        return BRAND_SPECIFIC_TOKEN_ATTEMPTS;
+        // Dynamically extract max attempts from token definitions - single source of truth
+        Map<String, Integer> attempts = new HashMap<>();
+        for (AuthTokenDefinition token : TOKEN_DEFINITIONS) {
+            attempts.put(token.getName(), token.getMaxAttempts());
+        }
+        return attempts;
     }
     
     @Override
