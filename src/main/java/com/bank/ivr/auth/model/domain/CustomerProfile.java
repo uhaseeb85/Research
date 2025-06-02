@@ -1,6 +1,7 @@
 package com.bank.ivr.auth.model.domain;
 
 import java.time.LocalDate;
+import java.time.Period;
 
 public class CustomerProfile {
     
@@ -17,6 +18,11 @@ public class CustomerProfile {
     private String email;
     private String address;
     private String accountStatus;
+    
+    // Additional fields for brand-specific features
+    private String faceIdHash;
+    private Boolean mobileAppEnrolled;
+    private Double accountBalance;
     
     // Default constructor
     public CustomerProfile() {}
@@ -35,6 +41,9 @@ public class CustomerProfile {
         this.email = builder.email;
         this.address = builder.address;
         this.accountStatus = builder.accountStatus;
+        this.faceIdHash = builder.faceIdHash;
+        this.mobileAppEnrolled = builder.mobileAppEnrolled;
+        this.accountBalance = builder.accountBalance;
     }
     
     // Getters and Setters
@@ -142,6 +151,41 @@ public class CustomerProfile {
         this.accountStatus = accountStatus;
     }
     
+    public String getFaceIdHash() {
+        return faceIdHash;
+    }
+    
+    public void setFaceIdHash(String faceIdHash) {
+        this.faceIdHash = faceIdHash;
+    }
+    
+    public Boolean getMobileAppEnrolled() {
+        return mobileAppEnrolled;
+    }
+    
+    public void setMobileAppEnrolled(Boolean mobileAppEnrolled) {
+        this.mobileAppEnrolled = mobileAppEnrolled;
+    }
+    
+    public Double getAccountBalance() {
+        return accountBalance;
+    }
+    
+    public void setAccountBalance(Double accountBalance) {
+        this.accountBalance = accountBalance;
+    }
+    
+    /**
+     * Calculates and returns the customer's age based on date of birth.
+     * Returns null if date of birth is not set.
+     */
+    public Integer getAge() {
+        if (dateOfBirth == null) {
+            return null;
+        }
+        return Period.between(dateOfBirth, LocalDate.now()).getYears();
+    }
+    
     public static Builder builder() {
         return new Builder();
     }
@@ -159,6 +203,9 @@ public class CustomerProfile {
         private String email;
         private String address;
         private String accountStatus = "ACTIVE"; // default
+        private String faceIdHash;
+        private Boolean mobileAppEnrolled;
+        private Double accountBalance;
         
         public Builder customerId(String customerId) {
             this.customerId = customerId;
@@ -220,6 +267,21 @@ public class CustomerProfile {
             return this;
         }
         
+        public Builder faceIdHash(String faceIdHash) {
+            this.faceIdHash = faceIdHash;
+            return this;
+        }
+        
+        public Builder mobileAppEnrolled(Boolean mobileAppEnrolled) {
+            this.mobileAppEnrolled = mobileAppEnrolled;
+            return this;
+        }
+        
+        public Builder accountBalance(Double accountBalance) {
+            this.accountBalance = accountBalance;
+            return this;
+        }
+        
         public CustomerProfile build() {
             if (customerId == null) {
                 throw new IllegalArgumentException("Customer ID is required");
@@ -244,6 +306,9 @@ public class CustomerProfile {
                ", email='" + email + '\'' +
                ", address='" + address + '\'' +
                ", accountStatus='" + accountStatus + '\'' +
+               ", faceIdHash='" + faceIdHash + '\'' +
+               ", mobileAppEnrolled=" + mobileAppEnrolled +
+               ", accountBalance=" + accountBalance +
                '}';
     }
 } 
