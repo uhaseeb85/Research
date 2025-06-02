@@ -422,6 +422,78 @@ public class DigitalBankBiometricEligibilityRule implements EligibilityRule {
 }
 ```
 
+## 🎯 Brand Targeting for Rules
+
+### How to Ensure Rules Apply to Specific Brands
+
+**Critical**: Always implement the `getBrand()` method to control which brands your rule affects:
+
+```java
+@Component
+public class DigitalBankAgeRule implements TokenSelectionRule {
+    
+    @Override
+    public String getBrand() {
+        return "DIGITAL_BANK";  // Only applies to this specific brand
+    }
+    
+    @Override
+    public String determineNextToken(AuthenticationContext context, CustomerProfile profile) {
+        // Your brand-specific logic here
+        if (profile.getAge() < 30) {
+            return "FACE_ID";
+        }
+        return null;
+    }
+    
+    @Override
+    public int getPriority() {
+        return 200;
+    }
+}
+```
+
+### Brand Targeting Options
+
+| getBrand() Return Value | Effect |
+|------------------------|--------|
+| `"DIGITAL_BANK"` | Only applies to DIGITAL_BANK customers |
+| `"PREMIUM_BANK"` | Only applies to PREMIUM_BANK customers |
+| `"DEFAULT"` | Applies to ALL brands as fallback |
+
+### Rule Execution Logic
+
+The framework filters rules by brand during execution:
+
+1. **Brand-specific rules** (exact brand match) execute first by priority
+2. **DEFAULT rules** execute as fallback if no brand-specific rule returns a token
+3. **First rule to return a token wins** - remaining rules are skipped
+
+```java
+// Example execution for "DIGITAL_BANK" customer:
+// 1. DigitalBankTrustRule (brand: "DIGITAL_BANK", priority: 250) → returns "SSN_LAST_4" ✅ STOPS
+// 2. DigitalBankAgeRule (brand: "DIGITAL_BANK", priority: 200) → ❌ NEVER EXECUTED
+// 3. DefaultTokenRule (brand: "DEFAULT", priority: 100) → ❌ NEVER EXECUTED
+```
+
+### Multiple Brand Support
+
+To support multiple brands, create separate rule classes:
+
+```java
+@Component
+public class DigitalBankMobileFirstRule implements TokenSelectionRule {
+    public String getBrand() { return "DIGITAL_BANK"; }
+    // Digital Bank specific logic
+}
+
+@Component  
+public class CommunityBankSimpleRule implements TokenSelectionRule {
+    public String getBrand() { return "COMMUNITY_BANK"; }
+    // Community Bank specific logic  
+}
+```
+
 ## 📡 API Endpoints
 
 ### Authentication
@@ -461,18 +533,18 @@ GET /api/v1/auth/dnis                    # Get all DNIS configurations
 ### ✅ Best Practices
 ```java
 // DO: Keep validators simple and focused
-@Override
+    @Override
 public boolean validate(String customerId, String value, CustomerProfile profile) {
     return BCrypt.checkpw(value, profile.getStoredHash());
 }
 
 // DO: Use meaningful rule priorities
-public int getPriority() {
+    public int getPriority() {
     return 200; // Higher than default (100), lower than critical security (300)
-}
-
+    }
+    
 // DO: Be explicit about brand targeting
-public String getBrand() {
+    public String getBrand() {
     return "DIGITAL_BANK"; // Specific brand only
 }
 
@@ -490,12 +562,12 @@ if (brand.equals("DIGITAL_BANK") && someCondition) {
 }
 
 // DON'T: Use low priorities that never execute
-public int getPriority() {
+    public int getPriority() {
     return 1; // Will be overridden by everything
-}
-
+    }
+    
 // DON'T: Apply rules to all brands unintentionally
-public String getBrand() {
+    public String getBrand() {
     return "DEFAULT"; // Affects ALL brands
 }
 
