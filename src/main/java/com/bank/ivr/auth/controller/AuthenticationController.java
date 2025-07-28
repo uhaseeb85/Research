@@ -31,6 +31,8 @@ import com.bank.ivr.auth.service.SessionContextService;
 import com.bank.ivr.auth.util.LoggingUtil;
 
 /**
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
  * REST controller for IVR authentication operations.
  * Handles brand-aware authentication endpoint for customer verification.
  * Now includes DNIS configuration support and session context integration.
