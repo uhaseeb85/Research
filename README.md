@@ -910,8 +910,6 @@ public class CommunityBankAuthConfiguration implements BrandAuthConfiguration {
 }
 ```
 
-Ignore
-
 #### Step 3: Results
 
 With this configuration:
