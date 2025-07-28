@@ -44,6 +44,7 @@ import com.bank.ivr.auth.service.BrandAuthConfigurationService;
 import com.bank.ivr.auth.service.DnisConfigurationService;
 import com.bank.ivr.auth.service.SessionContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bank.ivr.auth.controller.AuthenticationController;
 
 @WebMvcTest(AuthenticationController.class)
 @DisplayName("Brand-Aware Authentication Controller Tests")
