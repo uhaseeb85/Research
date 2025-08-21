@@ -16,12 +16,14 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.bank.ivr.auth.model.domain.AuthTokenDefinition;
 import com.bank.ivr.auth.model.domain.DnisConfiguration;
+import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.request.AuthenticationRequest;
 import com.bank.ivr.auth.model.response.AuthenticationResponse;
 import com.bank.ivr.auth.service.AuthenticationOrchestrator;
